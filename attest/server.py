@@ -21,7 +21,7 @@ import os
 import secrets
 import threading
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -51,6 +51,7 @@ RULE_TAGS = {
     "citation-required": "grounding",
     "requester-scoped-identity": "authz",
     "hash-chain": "integrity",
+    "hris-idp-join": "access",
 }
 PERSONAS = {
     "security-engineer": {"user": "s.vemula@attest.internal", "grants": ["read:evidence", "read:documents", "approve:questionnaire"],
@@ -343,6 +344,87 @@ class App:
                 counts[e["rule"]] += 1
         return counts
 
+    def _sources_view(self, results: dict, now: datetime) -> tuple[list, dict | None]:
+        """The evidence-source catalog joined with what the store actually holds."""
+        try:
+            from attest.sources import FAMILIES, JOIN, sources_by_family
+        except ImportError:  # catalog not built yet
+            return [], None
+        records = self.store.all()
+        by_source: dict[str, list] = {}
+        for r in records:
+            by_source.setdefault(r.source, []).append(r)
+        rank = {"FAIL": 0, "DEGRADED": 1, "PASS": 2}
+        families = []
+        for fid, sources in sources_by_family().items():
+            rows = []
+            for src in sources:
+                recs = by_source.get(src.id, [])
+                ctls = [c for c in self.catalog.values() if set(c.required_kinds) & set(src.kinds)]
+                if set(src.kinds) & set(JOIN["inputs"]) and JOIN["control"] in self.catalog and self.catalog[JOIN["control"]] not in ctls:
+                    ctls.append(self.catalog[JOIN["control"]])
+                states = [results[c.id].state for c in ctls if c.id in results]
+                newest = max(recs, key=lambda r: r.collected_at) if recs else None
+                rows.append(dict(id=src.id, system=src.system, proves=src.proves, kinds=list(src.kinds),
+                                 records=len(recs), newest_age=_age(newest.collected_at, now) if newest else None,
+                                 controls=[c.id for c in ctls],
+                                 state=min(states, key=lambda x: rank[x]) if states else None))
+            families.append(dict(id=fid, name=FAMILIES[fid], sources=rows))
+        latest = None
+        join_recs = [r for r in records if r.kind == JOIN["output"]]
+        if join_recs:
+            r = join_recs[-1]
+            latest = dict(id=r.id, result=r.payload.get("result"), summary=r.payload.get("summary"),
+                          orphans=r.payload.get("orphans", []), checked=r.payload.get("checked"),
+                          sla_hours=r.payload.get("sla_hours"), age=_age(r.collected_at, now))
+        join = dict(JOIN, inputs=list(JOIN["inputs"]), latest=latest)
+        return families, join
+
+    # ---- the HRIS × IdP join (the highest-value check in the pipeline) -----
+    def run_join(self, trigger: str = "manual") -> dict:
+        from attest.collectors.joiner_leaver import run_join
+        rec = run_join(self.store)
+        failed = rec.payload.get("result") == "fail"
+        orphans = rec.payload.get("orphans", [])
+        self.audit.record(actor="join-collector", action="join.finding" if failed else "join.pass",
+                          subject=orphans[0]["email"] if orphans else "hris-idp-join", detail=rec.payload.get("summary", ""))
+        if failed and orphans:
+            o = orphans[0]
+            self._event("finding", f"Leaver still has an active IdP account {o.get('days_open', '?')} days after termination",
+                        f"hris-idp-join · {o.get('name')} <{o.get('email')}> · terminated {o.get('terminated')} · IdP {o.get('idp_status')}",
+                        [RULE_TAGS["hris-idp-join"]], rule="hris-idp-join",
+                        enforcement="The HR roster was joined against the identity provider's user list. A terminated employee with an active account is an access-control failure regardless of what the last access review signed off.",
+                        disposition="CTL-ACCESS-02 is now FAIL — SOC 2 CC6.2, ISO/IEC A.5.18, HIPAA §164.308(a)(3)(ii)(C). Deprovision the account and re-run the join.",
+                        identity=f"join-collector · inputs: hris.roster × idp.users · trigger: {trigger}")
+        else:
+            self._event("allowed", "Leaver join clean: every terminated employee was deprovisioned inside the SLA",
+                        f"hris-idp-join · {rec.payload.get('summary', '')}", [RULE_TAGS["hris-idp-join"]], rule="hris-idp-join",
+                        disposition="CTL-ACCESS-02 holds on evidence, not on the last review's signature.",
+                        identity=f"join-collector · inputs: hris.roster × idp.users · trigger: {trigger}")
+        return rec.payload
+
+    def terminate_user(self) -> dict:
+        """Demo: HR records a termination but nobody deprovisions the IdP account. Then run the join."""
+        rosters = self.store.query(kind="hris.roster")
+        idps = self.store.query(kind="idp.users")
+        if not rosters or not idps:
+            raise ValueError("the store has no HRIS roster / IdP user list to join")
+        roster = rosters[-1]
+        employees = [dict(e) for e in roster.payload.get("employees", [])]
+        active = {u.get("email") for u in idps[-1].payload.get("users", []) if u.get("status") == "active"}
+        victim = next((e for e in employees if not e.get("terminated") and e.get("email") in active), None)
+        if victim is None:
+            raise ValueError("every active employee has already been terminated in this demo — reset to start over")
+        when = (datetime.now(timezone.utc) - timedelta(days=9)).strftime("%Y-%m-%d")
+        victim["terminated"] = when
+        terminated = sum(1 for e in employees if e.get("terminated"))
+        self.store.append(source="hris", kind="hris.roster", control_ids=list(roster.control_ids), classification="internal",
+                          payload={"summary": f"HRIS roster: {len(employees)} employees, {terminated} terminated (latest: {victim.get('name')} on {when})",
+                                   "result": "pass", "employees": employees})
+        self.audit.record(actor="collector-agent", action="hris.termination", subject=victim.get("email", "?"),
+                          detail=f"terminated {when}; IdP account left active")
+        return self.run_join(trigger="hris.termination")
+
     def state(self, persona: str = DEFAULT_PERSONA) -> dict:
         now = datetime.now(timezone.utc)
         records = self.store.all()
@@ -353,7 +435,7 @@ class App:
             if slas and age_h <= min(slas):
                 fresh += 1
         evidence = [dict(id=r.id, source=r.source, kind=r.kind, classification=r.classification,
-                         digest=r.sha256[:6], age=_age(r.collected_at, now)) for r in reversed(records[-8:])]
+                         digest=r.sha256[:6], age=_age(r.collected_at, now)) for r in reversed(records[-12:])]
         p = PERSONAS.get(persona, PERSONAS[DEFAULT_PERSONA])
         results = {r.control_id: r for r in self.engine.evaluate(now)}
 
@@ -367,6 +449,7 @@ class App:
                          spec=c.hipaa_spec, frameworks=c.mappings,
                          failing_summary=failing_summary(c) if results[c.id].state == "FAIL" else None)
                     for c in self.catalog.values() if c.id in results]
+        sources, join = self._sources_view(results, now)
         return dict(
             generated_at=now_iso(),
             identity=dict(persona=persona, user=p["user"], grants=p["grants"], label=p["label"]),
@@ -382,6 +465,7 @@ class App:
             audit=[asdict(e) for e in reversed(self.audit.all())][:40],
             catalog=[dict(id=c.id, name=c.name) for c in self.catalog.values()],
             controls=controls,
+            sources=sources, join=join,
         )
 
 
@@ -461,6 +545,10 @@ class Handler(BaseHTTPRequestHandler):
                     app.answer(question, body.get("control_ids") or [], persona=persona, llm=bool(body.get("llm")))
                 elif path == "/api/decide":
                     app.decide(body["question_id"], body["decision"], persona)
+                elif path == "/api/collect/join":
+                    app.run_join(trigger="manual")
+                elif path == "/api/demo/terminate":
+                    app.terminate_user()
                 elif path == "/api/tamper":
                     app.tamper()
                 elif path == "/api/reseed":

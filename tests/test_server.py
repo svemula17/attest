@@ -188,3 +188,33 @@ def test_http_identity_header(tmp_path):
     finally:
         server.shutdown()
         server.server_close()
+
+
+# ---- evidence sources + the HRIS × IdP join ----------------------------------
+def test_state_exposes_source_families_and_join(app):
+    s = app.state()
+    names = [f["name"] for f in s["sources"]]
+    assert names == ["Access control", "Change management", "Vulnerability management", "Infrastructure and configuration",
+                     "Endpoints", "People", "Operations", "Third party"]
+    every = [src for f in s["sources"] for src in f["sources"]]
+    assert all(src["records"] >= 1 for src in every), [src["id"] for src in every if src["records"] == 0]
+    assert s["join"]["latest"]["result"] == "pass" and s["join"]["control"] == "CTL-ACCESS-02"
+
+
+def test_terminate_without_deprovisioning_fails_the_leaver_control(app):
+    before = {c["id"]: c["state"] for c in app.state()["controls"]}
+    assert before["CTL-ACCESS-02"] == "PASS"
+    payload = app.terminate_user()
+    assert payload["result"] == "fail" and payload["orphans"] and payload["orphans"][0]["days_open"] >= 9
+    after = {c["id"]: c["state"] for c in app.state()["controls"]}
+    assert after["CTL-ACCESS-02"] == "FAIL"
+    assert app.events[0]["verdict"] == "finding" and app.events[0]["rule"] == "hris-idp-join"
+    assert app.audit.all()[-1].action == "join.finding"
+    assert app.state()["join"]["latest"]["result"] == "fail"
+
+
+def test_join_can_be_rerun_and_is_clean_after_reseed(app):
+    assert app.run_join()["result"] == "pass"
+    app.terminate_user()
+    app.reseed()
+    assert app.state()["join"]["latest"]["result"] == "pass"

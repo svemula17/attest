@@ -266,6 +266,43 @@ def cmd_serve(args: argparse.Namespace) -> int:
     return serve(["--port", str(args.port), "--data", str(args.data)] + (["--keep"] if args.keep else []))
 
 
+def cmd_collect_join(args: argparse.Namespace) -> int:
+    from attest.collectors.joiner_leaver import run_join
+    store, audit, _ = _open(args.data)
+    try:
+        rec = run_join(store, sla_hours=args.sla_hours)
+    except ValueError as e:
+        print(f"collect join: {e}")
+        return 1
+    failed = rec.payload["result"] == "fail"
+    audit.record(actor="join-collector", action="join.finding" if failed else "join.pass",
+                 subject=rec.payload["orphans"][0]["email"] if failed else "hris-idp-join", detail=rec.payload["summary"])
+    print(f"{rec.id}  {rec.kind}  {rec.payload['result']}  {rec.payload['summary']}")
+    for o in rec.payload["orphans"]:
+        print(f"    {o['name']:<22} {o['email']:<38} terminated {o['terminated']}  idp={o['idp_status']}  open {o['days_open']}d")
+    return 2 if failed else 0
+
+
+def cmd_sources(args: argparse.Namespace) -> int:
+    from attest.sources import FAMILIES, JOIN, sources_by_family
+    counts: dict[str, int] = {}
+    if (args.data / "evidence.jsonl").exists():
+        store = EvidenceStore(args.data / "evidence.jsonl")
+        for r in store.all():
+            counts[r.source] = counts.get(r.source, 0) + 1
+    for fid, sources in sources_by_family().items():
+        print(f"\n{FAMILIES[fid]}")
+        print("-" * 78)
+        for src in sources:
+            n = f"{counts.get(src.id, 0):>3} records" if counts else ""
+            print(f"  {src.system:<30} {src.id:<16} {n}")
+            print(f"      proves: {src.proves}")
+            print(f"      kinds:  {', '.join(src.kinds)}")
+    print(f"\nDerived check: {JOIN['name']} — {' × '.join(JOIN['inputs'])} → {JOIN['output']} → {JOIN['control']}")
+    print(f"  {JOIN['proves']}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="attest", description=__doc__)
     p.add_argument("--data", type=Path, default=Path("data"), help="data directory (default ./data)")
@@ -309,6 +346,11 @@ def build_parser() -> argparse.ArgumentParser:
     gh.add_argument("--repo", required=True, metavar="OWNER/NAME")
     gh.add_argument("--token", help="GitHub token (default: $GITHUB_TOKEN, then $GH_TOKEN)")
     gh.set_defaults(fn=cmd_collect_github)
+    jn = csub.add_parser("join", help="HRIS roster × IdP users -> CTL-ACCESS-02 (access.leaver-deprovisioned)")
+    jn.add_argument("--sla-hours", type=int, default=24)
+    jn.set_defaults(fn=cmd_collect_join)
+
+    sub.add_parser("sources", help="the evidence-source catalog: which systems prove what").set_defaults(fn=cmd_sources)
 
     g = sub.add_parser("gate", help="CI gate: exit 1 on any FAIL without a current risk acceptance")
     g.add_argument("--accept-file", type=Path, default=Path("gate.json"),

@@ -257,10 +257,11 @@ def test_posture_rows_include_hipaa_spec(catalog, store):
     assert "CTL-CHANGE-01" not in spec_by_control
     assert "CTL-NET-01" not in spec_by_control
 
-    # One row per (control, framework_id): CC6.1 and CC7.2 are each cited twice.
+    # One row per (control, framework_id): CC6.1 (ACCESS-01, CRYPTO-01, SECRETS-01)
+    # and CC7.2 (LOG-01, MON-01, DETECT-01) are each cited three times.
     soc2_ids = [row["framework_id"] for row in engine.posture("soc2", now=NOW)]
-    assert soc2_ids.count("CC6.1") == 2
-    assert soc2_ids.count("CC7.2") == 2
+    assert soc2_ids.count("CC6.1") == 3
+    assert soc2_ids.count("CC7.2") == 3
     assert len(soc2_ids) == sum(len(c.mappings["soc2"]) for c in catalog)
 
 

@@ -119,7 +119,7 @@ def test_evidence_query_returns_only_publishable_records(ctx):
     by_class = ids_by_classification(ctx)
     assert by_class["internal"] and by_class["restricted"]  # the seed has both
 
-    is_error, result = call(ctx, "evidence_query")
+    is_error, result = call(ctx, "evidence_query", {"limit": 100})
     assert is_error is False
     returned = {r["id"] for r in result["records"]}
     assert returned == by_class["publishable"]

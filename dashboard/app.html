@@ -218,6 +218,21 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
 .au .who{display:block;font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--ink-3);margin-top:2px;overflow-wrap:anywhere}
 .au.new{background:var(--accent-soft)}
 
+/* ── 06 sources ── */
+.fam{margin-bottom:14px}
+.proves{font-size:12.5px;color:var(--ink-2);max-width:38ch}
+.kinds .tag{display:inline-block;margin:1px 3px 1px 0}
+.join{margin-bottom:16px;border-color:var(--accent-line)}
+.join .card-h{background:var(--accent-soft)}
+.join-body{padding:14px 16px;display:grid;gap:12px}
+.join .lead{font-size:13.5px;color:var(--ink-2);max-width:74ch}
+.join-res{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:6px;font-size:12.5px}
+.join-res.red{border-left:3px solid var(--fail)}
+.join-res .mono{font-size:12px}
+.join-res ul{margin:0;padding-left:18px;color:var(--ink-2)}
+.join .acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ev[data-v="finding"] .evbtn{border-left-color:var(--fail)}
+
 /* ── demo panel ── */
 .scrim{position:fixed;inset:0;background:rgba(11,18,32,.35);z-index:30}
 .panel{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow-lg);z-index:31;display:flex;flex-direction:column;padding:18px 20px;gap:14px;overflow:auto}
@@ -260,6 +275,7 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
       <section id="v-approvals" hidden></section>
       <section id="v-frameworks" hidden></section>
       <section id="v-ledger" hidden></section>
+      <section id="v-sources" hidden></section>
     </div>
   </div>
 </div>
@@ -275,6 +291,10 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
   </div>
   <div class="grp"><div class="k">Answer agent</div>
     <button type="button" class="btn block" data-do="ask-13">Ask about 13 controls at once</button>
+  </div>
+  <div class="grp"><div class="k">Access — HRIS × IdP join</div>
+    <button type="button" class="btn block danger" data-do="terminate">Terminate an employee in HRIS, leave IdP active</button>
+    <button type="button" class="btn block" data-do="join">Run the leaver join</button>
   </div>
   <div class="grp"><div class="k">Ledger</div>
     <button type="button" class="btn block danger" data-do="tamper">Tamper with a record on disk</button>
@@ -298,10 +318,11 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
     { id:"agent", num:"02", label:"Agent layer", eyebrow:"02 · Agent layer", title:"Governed agent activity", note:"Agents draft, humans decide. Every action here ran against the real evidence store and was written to the real audit log." },
     { id:"approvals", num:"03", label:"Approvals", eyebrow:"03 · Human decision", title:"Awaiting approval", note:"Nothing here has left the building. Approval records a named human against the claim and signs it." },
     { id:"frameworks", num:"04", label:"Frameworks", eyebrow:"04 · Frameworks", title:"One catalog, three frameworks", note:"Controls are tested once and mapped outward, so a single gap surfaces everywhere it applies instead of being rediscovered per audit." },
-    { id:"ledger", num:"05", label:"Ledger", eyebrow:"05 · Ledger", title:"Evidence store and audit trail", note:"Append-only and hash-chained. The agent layer can read it and propose against it; it cannot rewrite it." }
+    { id:"ledger", num:"05", label:"Ledger", eyebrow:"05 · Ledger", title:"Evidence store and audit trail", note:"Append-only and hash-chained. The agent layer can read it and propose against it; it cannot rewrite it." },
+    { id:"sources", num:"06", label:"Sources", eyebrow:"06 · Evidence sources", title:"What each system proves", note:"Every control is fed by named systems. The families below are the list an auditor works from — and the HRIS × IdP join is the one check that makes an access review real." }
   ];
   var STATE = { PASS:"pass", DEGRADED:"warn", FAIL:"fail" }, STATE_RANK = { FAIL:0, DEGRADED:1, PASS:2 };
-  var VERDICT = { blocked:"fail", allowed:"pass", declined:"warn", escalated:"warn" };
+  var VERDICT = { blocked:"fail", allowed:"pass", declined:"warn", escalated:"warn", finding:"fail" };
   var CLASS = { publishable:"mute", internal:"acc", restricted:"fail" };
   var RULES = [
     ["untrusted-doc-isolation","LLM01","Vendor reports, RFPs and questionnaires are read in a context with no write-capable tools registered. Reading and acting are separate passes with separate privileges."],
@@ -346,8 +367,9 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
     $("#panel").hidden = !panel; $("#scrim").hidden = !panel; $("#demo-btn").setAttribute("aria-expanded", String(panel));
     $("#ctl-count").textContent = S.controls.length;
     var pending = S.queue.filter(function(q){ return !q.decision; }).length, blocked = S.events.filter(function(e){ return e.verdict === "blocked"; }).length, g = gap();
-    var meta = { posture: S.summary.pass + "/" + S.summary.total, agent: blocked + " blocked", approvals: pending ? pending + " pending" : "clear", frameworks: g ? g.hits.length + " hits" : "no gaps", ledger: S.chain_intact ? "intact" : "broken" };
-    var tone = { posture: S.summary.fail ? "red" : "", agent: blocked ? "red" : "", approvals: pending ? "amber" : "", frameworks: g ? "red" : "", ledger: S.chain_intact ? "" : "red" };
+    var nsrc = (S.sources || []).reduce(function(a, f){ return a + f.sources.length; }, 0), joinBad = !!(S.join && S.join.latest && S.join.latest.result === "fail");
+    var meta = { posture: S.summary.pass + "/" + S.summary.total, agent: blocked + " blocked", approvals: pending ? pending + " pending" : "clear", frameworks: g ? g.hits.length + " hits" : "no gaps", ledger: S.chain_intact ? "intact" : "broken", sources: joinBad ? "join finding" : nsrc + " systems" };
+    var tone = { posture: S.summary.fail ? "red" : "", agent: blocked ? "red" : "", approvals: pending ? "amber" : "", frameworks: g ? "red" : "", ledger: S.chain_intact ? "" : "red", sources: joinBad ? "red" : "" };
     $("#nav").innerHTML = VIEWS.map(function(v){ return '<button type="button" class="nav-item" data-view="' + v.id + '"' + (v.id === view ? ' aria-current="page"' : '') + '><span class="n">' + v.num + '</span><span class="l">' + h(v.label) + '</span><span class="m ' + tone[v.id] + '">' + h(meta[v.id]) + '</span></button>'; }).join("");
     var cur = VIEWS.filter(function(v){ return v.id === view; })[0];
     $("#view-eyebrow").textContent = cur.eyebrow; $("#view-title").textContent = cur.title; $("#view-note").textContent = cur.note;
@@ -438,7 +460,23 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
       '<div class="legend"><span>Every record’s SHA-256 covers its content plus the previous digest. No update or delete method exists — by construction.</span></div></div></div>';
   }
 
-  function render(){ chrome(); posture(); agent(); approvals(); frameworks(); ledger(); }
+  function sources(){
+    var J = S.join, fam = S.sources || [];
+    var joinCard = "";
+    if(J){
+      var L = J.latest;
+      joinCard = '<div class="card join"><div class="card-h"><h3>' + h(J.name) + '</h3><span class="sub">derived check · ' + h(J.inputs.join(" × ")) + ' → ' + h(J.output) + ' → ' + h(J.control) + '</span><div class="right">' + (L ? (L.result === "fail" ? pill("fail", "finding") : pill("pass", "clean")) : pill("mute nodot", "not run")) + '</div></div>' +
+        '<div class="join-body"><p class="lead">' + h(J.proves) + '</p>' +
+        (L ? '<div class="join-res' + (L.result === "fail" ? ' red' : '') + '"><div class="mono">' + h(L.summary) + '</div>' + (L.orphans && L.orphans.length ? '<ul>' + L.orphans.map(function(o){ return '<li><b>' + h(o.name) + '</b> <span class="mono">' + h(o.email) + '</span> · terminated ' + h(o.terminated) + ' · IdP ' + h(o.idp_status) + ' · open ' + h(o.days_open) + ' days</li>'; }).join("") + '</ul>' : '') + '<div class="hint">checked ' + h(L.checked) + ' leavers against a ' + h(L.sla_hours) + 'h SLA · ' + h(L.age) + ' ago</div></div>' : '') +
+        '<div class="acts"><button type="button" class="btn sm" data-do="join">Run the join</button><button type="button" class="btn sm danger" data-do="terminate">Terminate an employee in HRIS, leave their IdP account active</button><span class="hint">Each run appends a new evidence record; the finding stays on the ledger.</span></div></div></div>';
+    }
+    $("#v-sources").innerHTML = joinCard + (fam.length ? fam.map(function(f){
+      var n = f.sources.reduce(function(a, s){ return a + s.records; }, 0);
+      return '<div class="card fam"><div class="card-h"><h3>' + h(f.name) + '</h3><span class="sub">' + f.sources.length + ' system' + (f.sources.length === 1 ? '' : 's') + ' · ' + n + ' record' + (n === 1 ? '' : 's') + '</span></div><div class="tbl-wrap"><table><thead><tr><th>System</th><th>Proves</th><th>Evidence kinds</th><th>Records</th><th>Newest</th><th>State</th></tr></thead><tbody>' +
+        f.sources.map(function(s){ return '<tr><td><div class="rowname">' + h(s.system) + '</div><div class="rowcid">' + h(s.id) + '</div></td><td class="proves">' + h(s.proves) + '</td><td class="kinds">' + s.kinds.map(function(k){ return '<span class="tag">' + h(k) + '</span>'; }).join(" ") + '</td><td class="num">' + s.records + '</td><td class="num">' + h(s.newest_age || "—") + '</td><td>' + (s.state ? pill(STATE[s.state], s.state.toLowerCase()) : pill("mute nodot", "no control")) + '</td></tr>'; }).join("") + '</tbody></table></div></div>';
+    }).join("") : '<p class="empty">The source catalog is not available on this server build.</p>');
+  }
+  function render(){ chrome(); posture(); agent(); approvals(); frameworks(); ledger(); sources(); }
 
   document.addEventListener("click", function(ev){
     var nav = ev.target.closest("[data-view]"); if(nav){ view = nav.dataset.view; chrome(); window.scrollTo(0, 0); return; }
@@ -457,6 +495,8 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
     else if(act === "read-pasted") api("/api/read-doc", {text: $("#paste").value, doc_id: $("#paste-id").value || undefined}).then(go("agent"));
     else if(act === "ask-13") api("/api/answer", {question:"Summarise the state of every control in one answer.", control_ids: S.catalog.map(function(k){ return k.id; }).concat(["CTL-X-01","CTL-X-02","CTL-X-03"])}).then(go("approvals"));
     else if(act === "tamper") api("/api/tamper").then(go("ledger"));
+    else if(act === "terminate") api("/api/demo/terminate").then(go("sources"));
+    else if(act === "join") api("/api/collect/join").then(go("sources"));
     else if(act === "reseed"){ openKey = null; picked = []; window.__auditNew = false; api("/api/reseed").then(function(){ panel = false; chrome(); }); }
   });
   document.addEventListener("submit", function(ev){

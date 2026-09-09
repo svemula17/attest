@@ -119,7 +119,7 @@ def _resolve_now(now: datetime | None) -> datetime:
 # --------------------------------------------------------------------------- #
 # Catalog
 # --------------------------------------------------------------------------- #
-def default_catalog() -> list[Control]:
+def _base_catalog() -> list[Control]:
     """Return the built-in control catalog with SOC 2 / ISO 27001 / HIPAA citations.
 
     SOC 2 ids are Trust Services Criteria (2017, 2022 points of focus).
@@ -242,6 +242,139 @@ def default_catalog() -> list[Control]:
             mappings={
                 "soc2": ["CC6.6"],
                 "iso27001": ["A.8.20"],
+            },
+        ),
+        # -- additions beyond the original ten ------------------------------ #
+        Control(
+            id="CTL-ACCESS-02",
+            name="Leaver deprovisioning",
+            required_kinds=["access.leaver-deprovisioned"],
+            freshness_sla_hours=24,
+            mappings={
+                "soc2": ["CC6.2"],
+                "iso27001": ["A.5.18"],
+                "hipaa": ["164.308(a)(3)(ii)(C)"],
+            },
+            hipaa_spec="required",
+        ),
+        Control(
+            id="CTL-ACCESS-03",
+            name="Unused permissions and key age",
+            required_kinds=["iam.access-analyzer", "iam.key-age"],
+            freshness_sla_hours=24,
+            mappings={
+                "soc2": ["CC6.3"],
+                "iso27001": ["A.8.2"],
+            },
+        ),
+        Control(
+            id="CTL-CHANGE-02",
+            name="Secret scanning",
+            required_kinds=["github.secret-scanning"],
+            freshness_sla_hours=24,
+            mappings={
+                "soc2": ["CC8.1"],
+                "iso27001": ["A.8.28"],
+            },
+        ),
+        Control(
+            id="CTL-VULN-01",
+            name="Vulnerability remediation SLA",
+            required_kinds=["vuln.findings-sla", "inspector.findings"],
+            freshness_sla_hours=24,
+            mappings={
+                "soc2": ["CC7.1"],
+                "iso27001": ["A.8.8"],
+                "hipaa": ["164.308(a)(1)(ii)(B)"],
+            },
+            hipaa_spec="required",
+        ),
+        Control(
+            id="CTL-DETECT-01",
+            name="Threat detection findings",
+            required_kinds=["guardduty.findings"],
+            freshness_sla_hours=24,
+            mappings={
+                "soc2": ["CC7.2"],
+                "iso27001": ["A.8.16"],
+            },
+        ),
+        Control(
+            id="CTL-ENDPOINT-01",
+            name="Endpoint protection",
+            required_kinds=["mdm.disk-encryption", "mdm.edr-installed", "mdm.patch-level"],
+            freshness_sla_hours=24,
+            mappings={
+                "soc2": ["CC6.8"],
+                "iso27001": ["A.8.1"],
+                "hipaa": ["164.310(d)(1)"],
+            },
+            hipaa_spec="required",
+        ),
+        Control(
+            id="CTL-PEOPLE-01",
+            name="Security awareness training",
+            required_kinds=["training.completion", "training.phishing"],
+            freshness_sla_hours=720,  # 30 days
+            mappings={
+                "soc2": ["CC1.4"],
+                "iso27001": ["A.6.3"],
+                "hipaa": ["164.308(a)(5)(i)"],
+            },
+            hipaa_spec="required",
+        ),
+        Control(
+            id="CTL-PEOPLE-02",
+            name="Background checks and policy acknowledgement",
+            required_kinds=["hr.background-check", "hr.policy-ack"],
+            freshness_sla_hours=720,  # 30 days
+            mappings={
+                "soc2": ["CC1.1"],
+                "iso27001": ["A.6.1"],
+            },
+        ),
+        Control(
+            id="CTL-OPS-01",
+            name="Incident response SLA",
+            required_kinds=["incident.sla"],
+            freshness_sla_hours=168,  # 7 days
+            mappings={
+                "soc2": ["CC7.4"],
+                "iso27001": ["A.5.26"],
+                "hipaa": ["164.308(a)(6)(ii)"],
+            },
+            hipaa_spec="required",
+        ),
+        Control(
+            id="CTL-SECRETS-01",
+            name="Secret and key rotation",
+            required_kinds=["secrets.rotation"],
+            freshness_sla_hours=24,
+            mappings={
+                "soc2": ["CC6.1"],
+                "iso27001": ["A.8.24"],
+            },
+        ),
+        Control(
+            id="CTL-BACKUP-01",
+            name="Backup and restore testing",
+            required_kinds=["backup.snapshot", "backup.restore-test"],
+            freshness_sla_hours=168,  # 7 days
+            mappings={
+                "soc2": ["A1.2"],
+                "iso27001": ["A.8.13"],
+                "hipaa": ["164.308(a)(7)(ii)(A)"],
+            },
+            hipaa_spec="required",
+        ),
+        Control(
+            id="CTL-AVAIL-01",
+            name="Availability monitoring",
+            required_kinds=["uptime.availability"],
+            freshness_sla_hours=24,
+            mappings={
+                "soc2": ["A1.1"],
+                "iso27001": ["A.8.14"],
             },
         ),
     ]
@@ -418,3 +551,41 @@ class ControlEngine:
             "fail": counts[FAIL],
             "by_framework": by_framework,
         }
+
+
+def _extended_catalog() -> list[Control]:
+    """Controls fed by the wider evidence-source catalog (attest/sources.py)."""
+    return [
+        Control(id="CTL-ACCESS-02", name="Leaver deprovisioning", required_kinds=["access.leaver-deprovisioned"], freshness_sla_hours=24,
+                mappings={"soc2": ["CC6.2"], "iso27001": ["A.5.18"], "hipaa": ["164.308(a)(3)(ii)(C)"]}, hipaa_spec="required"),
+        Control(id="CTL-ACCESS-03", name="Unused permissions and key age", required_kinds=["iam.access-analyzer", "iam.key-age"], freshness_sla_hours=24,
+                mappings={"soc2": ["CC6.3"], "iso27001": ["A.8.2"]}),
+        Control(id="CTL-CHANGE-02", name="Secret scanning", required_kinds=["github.secret-scanning"], freshness_sla_hours=24,
+                mappings={"soc2": ["CC8.1"], "iso27001": ["A.8.28"]}),
+        Control(id="CTL-VULN-01", name="Vulnerability remediation SLA", required_kinds=["vuln.findings-sla", "inspector.findings"], freshness_sla_hours=24,
+                mappings={"soc2": ["CC7.1"], "iso27001": ["A.8.8"], "hipaa": ["164.308(a)(1)(ii)(B)"]}, hipaa_spec="required"),
+        Control(id="CTL-DETECT-01", name="Threat detection findings", required_kinds=["guardduty.findings"], freshness_sla_hours=24,
+                mappings={"soc2": ["CC7.2"], "iso27001": ["A.8.16"]}),
+        Control(id="CTL-ENDPOINT-01", name="Endpoint protection", required_kinds=["mdm.disk-encryption", "mdm.edr-installed", "mdm.patch-level"], freshness_sla_hours=24,
+                mappings={"soc2": ["CC6.8"], "iso27001": ["A.8.1"], "hipaa": ["164.310(d)(1)"]}, hipaa_spec="required"),
+        Control(id="CTL-PEOPLE-01", name="Security awareness training", required_kinds=["training.completion", "training.phishing"], freshness_sla_hours=720,
+                mappings={"soc2": ["CC1.4"], "iso27001": ["A.6.3"], "hipaa": ["164.308(a)(5)(i)"]}, hipaa_spec="required"),
+        Control(id="CTL-PEOPLE-02", name="Background checks and policy acknowledgement", required_kinds=["hr.background-check", "hr.policy-ack"], freshness_sla_hours=720,
+                mappings={"soc2": ["CC1.1"], "iso27001": ["A.6.1"]}),
+        Control(id="CTL-OPS-01", name="Incident response SLA", required_kinds=["incident.sla"], freshness_sla_hours=168,
+                mappings={"soc2": ["CC7.4"], "iso27001": ["A.5.26"], "hipaa": ["164.308(a)(6)(ii)"]}, hipaa_spec="required"),
+        Control(id="CTL-SECRETS-01", name="Secret and key rotation", required_kinds=["secrets.rotation"], freshness_sla_hours=24,
+                mappings={"soc2": ["CC6.1"], "iso27001": ["A.8.24"]}),
+        Control(id="CTL-BACKUP-01", name="Backup and restore testing", required_kinds=["backup.snapshot", "backup.restore-test"], freshness_sla_hours=168,
+                mappings={"soc2": ["A1.2"], "iso27001": ["A.8.13"], "hipaa": ["164.308(a)(7)(ii)(A)"]}, hipaa_spec="required"),
+        Control(id="CTL-AVAIL-01", name="Availability monitoring", required_kinds=["uptime.availability"], freshness_sla_hours=24,
+                mappings={"soc2": ["A1.1"], "iso27001": ["A.8.14"]}),
+    ]
+
+
+def default_catalog() -> list[Control]:
+    """The full control catalog, keyed by id (later definitions win, so no duplicates)."""
+    merged: dict[str, Control] = {}
+    for control in _base_catalog() + _extended_catalog():
+        merged[control.id] = control
+    return list(merged.values())

@@ -110,6 +110,28 @@ python3 -m attest.cli gate --strict        # DEGRADED fails too
 
 `python3 -m attest.mcp_server --data data` exposes the evidence store to MCP clients over stdio with three read-only tools (`evidence_query`, `evidence_get`, `controls_posture`), publishable records only, tool definitions frozen in code, no dynamic loading. See [docs/mcp.md](docs/mcp.md) for the Claude Desktop config.
 
+## Evidence sources — what each system proves
+
+The catalog in [`attest/sources.py`](attest/sources.py) is the list to have in your head. Every control is fed by named systems; every kind of evidence belongs to exactly one source (tested). Hardcoded for now — the seed carries one fresh record per source so all eight families light up in the ledger.
+
+| Family | Systems | What they prove |
+|---|---|---|
+| **Access control** — the biggest evidence family in any audit | Okta / Entra ID · AWS IAM + Access Analyzer · **HRIS (Workday / BambooHR)** · access-review records | User list, MFA enrollment, SSO enforcement, group membership, deprovisioning timestamps; roles, policies, unused permissions, root usage, key age; hire and termination dates |
+| Change management | GitHub · GitHub Actions / Jenkins | Branch protection, PR approvals, required status checks, who merged what, secret-scanning alerts; build history, approval gates, which scans ran, deployment records |
+| Vulnerability management | Snyk / SonarQube / Trivy · AWS Inspector | Findings, severity, time-to-remediate against SLA; host and image vulnerabilities |
+| Infrastructure and configuration | AWS Config · CloudTrail · GuardDuty / Security Hub · SIEM | Resource state (encryption on, public access blocked, logging enabled); API activity and privileged actions; detection findings and posture score |
+| Endpoints | Jamf / Intune / Kandji | Disk encryption, screen lock, OS patch level, EDR on every device |
+| People | KnowBe4 · HR system | Awareness-training completion, phishing-simulation results; background checks, policy acknowledgements |
+| Operations | Jira / ServiceNow · Vault / Secrets Manager · AWS Backup / DR · monitoring | Incident tickets and remediation SLA, change approvals; key rotation; snapshot success and restore tests; availability |
+| Third party | Vendor register | Vendor list, their SOC 2 reports, DPAs and BAAs, review dates |
+
+**The join.** HRIS against the IdP is the single highest-value check in the pipeline: join the roster's termination dates to the identity provider's user list and you find the accounts still active after someone left — which no quarterly access review signature can hide. It is a real collector here ([`attest/collectors/joiner_leaver.py`](attest/collectors/joiner_leaver.py)) feeding `CTL-ACCESS-02`, mapped to SOC 2 CC6.2, ISO/IEC 27001 A.5.18 and HIPAA §164.308(a)(3)(ii)(C). In the console, **Sources → Terminate an employee in HRIS, leave their IdP account active** records the termination, re-runs the join, and the control goes red on evidence.
+
+```bash
+python3 -m attest.cli sources          # the catalog, with record counts
+python3 -m attest.cli collect join     # run the HRIS × IdP join; exit 2 on a finding
+```
+
 ## Tests
 
 ```bash
