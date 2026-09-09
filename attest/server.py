@@ -356,9 +356,17 @@ class App:
                          digest=r.sha256[:6], age=_age(r.collected_at, now)) for r in reversed(records[-8:])]
         p = PERSONAS.get(persona, PERSONAS[DEFAULT_PERSONA])
         results = {r.control_id: r for r in self.engine.evaluate(now)}
+
+        def failing_summary(control):
+            failing = [r for r in self.store.query(control_id=control.id)
+                       if isinstance(r.payload, dict) and r.payload.get("result") == "fail"]
+            return failing[-1].payload.get("summary") if failing else None
+
         controls = [dict(id=c.id, name=c.name, state=results[c.id].state, reason=results[c.id].reason,
                          evidence=len(results[c.id].evidence_ids), sla_hours=c.freshness_sla_hours,
-                         spec=c.hipaa_spec, frameworks=c.mappings) for c in self.catalog.values() if c.id in results]
+                         spec=c.hipaa_spec, frameworks=c.mappings,
+                         failing_summary=failing_summary(c) if results[c.id].state == "FAIL" else None)
+                    for c in self.catalog.values() if c.id in results]
         return dict(
             generated_at=now_iso(),
             identity=dict(persona=persona, user=p["user"], grants=p["grants"], label=p["label"]),

@@ -79,6 +79,7 @@ def test_state_shape(app):
     rows = {c["id"]: c for c in s["controls"]}
     assert rows["CTL-VENDOR-01"]["state"] == "FAIL" and rows["CTL-VENDOR-01"]["reason"]
     assert rows["CTL-CRYPTO-01"]["spec"] == "addressable" and rows["CTL-CRYPTO-01"]["sla_hours"] == 24
+    assert "subprocessors" in rows["CTL-VENDOR-01"]["failing_summary"] and rows["CTL-CRYPTO-01"]["failing_summary"] is None
 
 
 def test_declined_draft_is_marked_gated_when_evidence_is_internal(app):

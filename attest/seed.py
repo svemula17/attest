@@ -44,5 +44,5 @@ def seed(data_dir: Path, now: datetime | None = None) -> tuple[EvidenceStore, Au
             payload={"summary": summary, "result": result},
             collected_at=collected,
         )
-    audit.record(actor="collector-agent", action="evidence.seeded", subject=str(data_dir), detail=f"{len(SEED)} records")
+    audit.record(actor="collector-agent", action="evidence.seeded", subject="evidence-store", detail=f"{len(SEED)} records from {len({r[2] for r in SEED})} sources")
     return store, audit

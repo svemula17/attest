@@ -30,7 +30,7 @@ What to click, in order, for a two-minute demo:
 
 ### Design
 
-The console is an implementation of [`design/Attest Console.dc.html`](design/Attest%20Console.dc.html), a Claude Design file on the **Modernist** system (`design/_ds/…`: Archivo, a single red accent, 2 px rules, zero radius, everything flush left). The design's static fixtures became `/api/state`, its `decide`/`submitDraft` became real calls, and its `approver` prop became the persona in the header. The DS stylesheet is inlined into `dashboard/app.html` so the app stays one file with no build step.
+The console's information architecture — five views behind a numbered rail, the gap called out before the numbers, an enforcement feed you expand row by row, an approval queue that writes a named human to the ledger — comes from [`design/Attest Console.dc.html`](design/Attest%20Console.dc.html), a Claude Design file (vendored with its design system under `design/`). The visual system in `dashboard/app.html` is its own: cool-neutral surfaces, a single cobalt accent reserved for navigation and actions, conventional semantic colors for state, Instrument Sans for the interface and JetBrains Mono for ids, hashes and timestamps, with a dark theme via `prefers-color-scheme`. No build step; the page is one file.
 
 `dashboard/attest.html` is the earlier single-file version with seeded data (published as a Claude artifact); `dashboard/app.html` is the live version the server serves.
 
