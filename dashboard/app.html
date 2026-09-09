@@ -311,6 +311,10 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
 (function(){
   "use strict";
   var S = null, view = "posture", fw = null, openKey = null, panel = false, picked = [];
+  var VIEW_IDS = ["posture", "agent", "approvals", "frameworks", "ledger", "sources"];
+  var hashView = (location.hash || "").replace("#", "").split("?")[0];
+  if(VIEW_IDS.indexOf(hashView) !== -1) view = hashView;
+  var hashFw = /[?&]fw=([a-z0-9]+)/.exec(location.hash || ""); if(hashFw) fw = hashFw[1];
   var $ = function(s){ return document.querySelector(s); };
   var h = function(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); };
   var VIEWS = [
@@ -479,7 +483,7 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
   function render(){ chrome(); posture(); agent(); approvals(); frameworks(); ledger(); sources(); }
 
   document.addEventListener("click", function(ev){
-    var nav = ev.target.closest("[data-view]"); if(nav){ view = nav.dataset.view; chrome(); window.scrollTo(0, 0); return; }
+    var nav = ev.target.closest("[data-view]"); if(nav){ view = nav.dataset.view; try { history.replaceState(null, "", "#" + view); } catch(e){} chrome(); window.scrollTo(0, 0); return; }
     var tab = ev.target.closest("[data-fw]"); if(tab){ fw = tab.dataset.fw; frameworks(); return; }
     var evb = ev.target.closest(".evbtn"); if(evb){ openKey = openKey === evb.dataset.key ? "" : evb.dataset.key; agent(); return; }
     var chip = ev.target.closest("button.chip"); if(chip){ var id = chip.dataset.chip, i = picked.indexOf(id); if(i === -1) picked.push(id); else picked.splice(i, 1); chip.setAttribute("aria-pressed", String(i === -1)); return; }
