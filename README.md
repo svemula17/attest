@@ -28,7 +28,11 @@ What to click, in order, for a two-minute demo:
 - **Every human decision is signed.** HMAC-SHA256 over `(question_id, sha256(answer), decision, approver, ts)` with a per-installation key (`data/approval.key`, mode 0600). The signature prefix lands in the audit line; the queue header shows whether every stored approval still verifies. Edit an approved answer and it stops verifying.
 - **Feed and queue are journaled** to `data/journal.jsonl` and replayed on `--keep`, so a restart does not lose the session. Evidence and audit remain the ledger; the journal is the UI's memory.
 
-`dashboard/attest.html` is the same UI as a static single file with seeded data (published as a Claude artifact); `dashboard/app.html` is the live version the server serves.
+### Design
+
+The console is an implementation of [`design/Attest Console.dc.html`](design/Attest%20Console.dc.html), a Claude Design file on the **Modernist** system (`design/_ds/…`: Archivo, a single red accent, 2 px rules, zero radius, everything flush left). The design's static fixtures became `/api/state`, its `decide`/`submitDraft` became real calls, and its `approver` prop became the persona in the header. The DS stylesheet is inlined into `dashboard/app.html` so the app stays one file with no build step.
+
+`dashboard/attest.html` is the earlier single-file version with seeded data (published as a Claude artifact); `dashboard/app.html` is the live version the server serves.
 
 ## Architecture
 

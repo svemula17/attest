@@ -76,6 +76,16 @@ def test_state_shape(app):
     assert s["summary"]["total"] == len(app.catalog)
     assert s["evidence_fresh"] <= s["evidence_total"]
     assert {r["id"] for r in s["catalog"]} == set(app.catalog)
+    rows = {c["id"]: c for c in s["controls"]}
+    assert rows["CTL-VENDOR-01"]["state"] == "FAIL" and rows["CTL-VENDOR-01"]["reason"]
+    assert rows["CTL-CRYPTO-01"]["spec"] == "addressable" and rows["CTL-CRYPTO-01"]["sla_hours"] == 24
+
+
+def test_declined_draft_is_marked_gated_when_evidence_is_internal(app):
+    gated = app.answer("Do you hold BAAs with every subprocessor?", ["CTL-VENDOR-01"])
+    assert gated["status"] == "DECLINED" and gated["gated"] is True
+    empty = app.answer("Any breach?", ["CTL-NONE"])
+    assert empty["status"] == "DECLINED" and empty["gated"] is False
 
 
 def test_http_round_trip(tmp_path):
@@ -86,7 +96,7 @@ def test_http_round_trip(tmp_path):
     thread.start()
     try:
         page = urllib.request.urlopen(f"http://127.0.0.1:{port}/").read().decode()
-        assert "<title>Attest Control Plane</title>" in page
+        assert "<title>Attest" in page
         state = json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/api/state"))
         assert state["chain_intact"] is True
         body = json.dumps({"example": "injected"}).encode()

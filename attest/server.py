@@ -228,7 +228,9 @@ class App:
         agent = AnswerAgent(self.store, self.audit, scope, allowlist=frozenset({"read:evidence"}), **kwargs)
         draft = agent.draft(qid, question, list(control_ids))
         mode = "claude-opus-5 draft · guardrails validated" if llm else "deterministic draft"
-        item = dict(question_id=qid, question=question, answer=draft.answer, evidence_ids=list(draft.evidence_ids),
+        gated = draft.status == "DECLINED" and any(
+            r.classification != "publishable" for cid in control_ids for r in self.store.query(control_id=cid))
+        item = dict(question_id=qid, question=question, answer=draft.answer, evidence_ids=list(draft.evidence_ids), gated=gated,
                     status=draft.status, reason=draft.reason, citations=self._citations(draft.evidence_ids),
                     control_ids=list(control_ids), mode=mode, requester=scope.user,
                     decision=None, approver=None, signature=None, signed_at=None)
@@ -353,6 +355,10 @@ class App:
         evidence = [dict(id=r.id, source=r.source, kind=r.kind, classification=r.classification,
                          digest=r.sha256[:6], age=_age(r.collected_at, now)) for r in reversed(records[-8:])]
         p = PERSONAS.get(persona, PERSONAS[DEFAULT_PERSONA])
+        results = {r.control_id: r for r in self.engine.evaluate(now)}
+        controls = [dict(id=c.id, name=c.name, state=results[c.id].state, reason=results[c.id].reason,
+                         evidence=len(results[c.id].evidence_ids), sla_hours=c.freshness_sla_hours,
+                         spec=c.hipaa_spec, frameworks=c.mappings) for c in self.catalog.values() if c.id in results]
         return dict(
             generated_at=now_iso(),
             identity=dict(persona=persona, user=p["user"], grants=p["grants"], label=p["label"]),
@@ -367,6 +373,7 @@ class App:
             events=self.events, queue=self.queue, rules=self._rule_counts(),
             audit=[asdict(e) for e in reversed(self.audit.all())][:40],
             catalog=[dict(id=c.id, name=c.name) for c in self.catalog.values()],
+            controls=controls,
         )
 
 

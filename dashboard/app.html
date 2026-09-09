@@ -3,441 +3,532 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Attest Control Plane</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
-
+<title>Attest Console</title>
+<!-- Modernist design system tokens + components (design/_ds/modernist-…/styles.css), inlined so the app stays a single file -->
 <style>
-:root{
-  --ground:#F1F3F7; --surface:#FFFFFF; --surface-2:#F7F8FC; --sunken:#EAEDF4;
-  --line:#DCE1EA; --line-strong:#BFC7D6;
-  --ink:#131824; --ink-2:#4B5568; --ink-3:#646E86;
-  --accent:#3B49C4; --accent-ink:#2B37A0; --accent-soft:#E6E8FA; --accent-fg:#FFFFFF;
-  --pass:#0F7A4E; --pass-soft:#E1F1E9;
-  --warn:#8F5B05; --warn-soft:#FAEFD9;
-  --fail:#B12F29; --fail-soft:#FAE5E3;
-  --shadow:0 1px 2px rgba(19,24,36,.05), 0 6px 18px -10px rgba(19,24,36,.22);
-  --radius:6px;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --ground:#0D1017; --surface:#141926; --surface-2:#1A2031; --sunken:#0A0D14;
-    --line:#242B3B; --line-strong:#39425A;
-    --ink:#E8EBF3; --ink-2:#A4ADC1; --ink-3:#78829A;
-    --accent:#7C8CFF; --accent-ink:#A9B4FF; --accent-soft:#1D2350; --accent-fg:#0D1017;
-    --pass:#3FD08D; --pass-soft:#0F2C22;
-    --warn:#E0A83E; --warn-soft:#2E2412;
-    --fail:#FF6B60; --fail-soft:#331715;
-    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -14px rgba(0,0,0,.8);
-  }
-}
-:root[data-theme="dark"]{
-  --ground:#0D1017; --surface:#141926; --surface-2:#1A2031; --sunken:#0A0D14;
-  --line:#242B3B; --line-strong:#39425A;
-  --ink:#E8EBF3; --ink-2:#A4ADC1; --ink-3:#78829A;
-  --accent:#7C8CFF; --accent-ink:#A9B4FF; --accent-soft:#1D2350; --accent-fg:#0D1017;
-  --pass:#3FD08D; --pass-soft:#0F2C22;
-  --warn:#E0A83E; --warn-soft:#2E2412;
-  --fail:#FF6B60; --fail-soft:#331715;
-  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -14px rgba(0,0,0,.8);
+/* Modernist — design-system tokens and component classes. This file is the source of truth for the system's look; retune it here and see readme.md. */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&display=swap');
+
+:root {
+  --color-bg: #f3f2f2;
+  --color-surface: #eae9e9;
+  --color-text: #201e1d;
+  --color-accent: #ec3013;
+  --color-accent-2: #e15b47;
+  --color-divider: color-mix(in srgb, #201e1d 40%, transparent);
+
+  /* Tonal ramps — generated in OKLCH on one shared lightness scale, so the
+     same step of any role matches the others in visual value. */
+  --color-neutral-100: #f8f4f4;
+  --color-neutral-200: #eae7e7;
+  --color-neutral-300: #d7d3d3;
+  --color-neutral-400: #bab6b6;
+  --color-neutral-500: #9b9797;
+  --color-neutral-600: #7d7979;
+  --color-neutral-700: #605d5d;
+  --color-neutral-800: #444141;
+  --color-neutral-900: #2d2b2b;
+
+  --color-accent-100: #fff2ef;
+  --color-accent-200: #ffe0d9;
+  --color-accent-300: #ffc4b8;
+  --color-accent-400: #ff9783;
+  --color-accent-500: #ff563c;
+  --color-accent-600: #dd2b0f;
+  --color-accent-700: #ae1800;
+  --color-accent-800: #7c1405;
+  --color-accent-900: #4d170e;
+
+  --color-accent-2-100: #fff2ef;
+  --color-accent-2-200: #ffe0da;
+  --color-accent-2-300: #ffc4b9;
+  --color-accent-2-400: #ff9784;
+  --color-accent-2-500: #ef6853;
+  --color-accent-2-600: #c94b39;
+  --color-accent-2-700: #9e3526;
+  --color-accent-2-800: #71261b;
+  --color-accent-2-900: #471d16;
+
+  --font-heading: "Archivo", system-ui, sans-serif;
+  --font-heading-weight: 800;
+  --font-body: "Archivo", system-ui, sans-serif;
+
+  --space-1: 4.0px;
+  --space-2: 8.0px;
+  --space-3: 12.0px;
+  --space-4: 16.0px;
+  --space-6: 24.0px;
+  --space-8: 32.0px;
+
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+
+  /* Elevation — derived from the ground: soft ink-tinted shadows on a
+     light theme, a hairline edge + ambient darkness on a dark one. */
+  --shadow-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
+  --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
 }
 
-*{box-sizing:border-box}
-body{
-  background:var(--ground); color:var(--ink);
-  font-family:"Public Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
-  font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
 }
-.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
-h1,h2,h3{margin:0; text-wrap:balance; letter-spacing:-.011em}
-p{margin:0}
-button{font:inherit; color:inherit}
-:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
+h1, h2, h3, h4 { font-family: var(--font-heading); font-weight: var(--font-heading-weight); }
 
-/* ---------- shell ---------- */
-.wrap{max-width:1240px; margin:0 auto; padding:0 24px}
-.topbar{
-  position:sticky; top:0; z-index:20;
-  background:color-mix(in srgb, var(--surface) 88%, transparent);
-  backdrop-filter:saturate(1.4) blur(10px);
-  border-bottom:1px solid var(--line);
+.grayscale{filter:grayscale(1) contrast(1.08)}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Components — built with the tokens above. Plain CSS
+   on plain HTML: no JavaScript, no build step. Each class is documented in
+   readme.md and demonstrated in foundations/ and components/.
+   ══════════════════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-size: 15px; line-height: 1.55; font-weight: 400; }
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 var(--space-2);
 }
-.topbar-in{display:flex; align-items:center; gap:16px; padding:12px 24px; max-width:1240px; margin:0 auto; flex-wrap:wrap}
-.mark{display:flex; align-items:baseline; gap:9px}
-.mark b{font-size:16px; font-weight:800; letter-spacing:-.02em}
-.mark span{font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; color:var(--ink-3); font-weight:600}
-.topbar-meta{margin-left:auto; display:flex; align-items:center; gap:14px; flex-wrap:wrap}
-.env{
-  font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
-  border:1px solid var(--line-strong); color:var(--ink-2);
-  padding:3px 8px; border-radius:100px;
+h1 { font-size: 42px; }
+h2 { font-size: 32px; }
+h3 { font-size: 25px; }
+h4 { font-size: 20px; }
+h5 { font-size: 16px; }
+h6 { font-size: 13px; }
+h6 { letter-spacing: 0.08em; text-transform: uppercase; }
+p { margin: 0 0 var(--space-3); }
+a { color: var(--color-accent); text-underline-offset: 3px; }
+img { display: block; max-width: 100%; }
+figure { margin: 0; }
+figcaption {
+  font-size: 11px; margin-top: var(--space-1);
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
 }
-.tick{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--ink-3)}
-.dot{width:7px; height:7px; border-radius:50%; background:var(--pass); box-shadow:0 0 0 3px var(--pass-soft)}
-@media(prefers-reduced-motion:no-preference){
-  .dot{animation:pulse 2.6s ease-in-out infinite}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.text-muted { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+
+/* — rules — */
+.hr {
+  height: 2px; border: 0; margin: var(--space-4) 0;
+  background: var(--color-divider);
 }
 
-main{padding:28px 0 64px}
-section{margin-bottom:38px}
-.sec-head{display:flex; align-items:flex-end; gap:14px; margin-bottom:14px; flex-wrap:wrap}
-.sec-head h2{font-size:15px; font-weight:700; letter-spacing:-.01em}
-.eyebrow{
-  font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:500;
-  letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3);
+/* — buttons — */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  cursor: pointer; text-decoration: none;
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 14px; line-height: 1.2; color: var(--color-text); /* matches the .input's 14px —
+     the pair sits side by side in sign-up rows */
+  background: transparent; border: 1px solid transparent;
+  padding: var(--space-2) calc(var(--space-3) * 1.2);
+  border-radius: var(--radius-md);
 }
-.sec-head .note{margin-left:auto; font-size:12.5px; color:var(--ink-3); max-width:46ch; text-align:right}
+.btn svg { display: block; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { background: var(--color-accent); color: var(--color-bg); }
+.btn-primary:hover { background: var(--color-accent-600); }
+.btn-primary:active { background: var(--color-accent-700); }
+.btn-secondary { border-color: var(--color-divider); }
+.btn-secondary:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.btn-secondary:active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
+.btn-ghost { color: var(--color-accent); padding-inline: var(--space-1); }
+.btn-ghost:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.btn-ghost:active { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
+.btn-icon { width: 36px; height: 36px; padding: 0; }
+.btn-block { width: 100%; margin-top: var(--space-2); justify-content: flex-start; text-align: left; }
 
-/* ---------- posture strip ---------- */
-.tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden}
-.tile{background:var(--surface); padding:16px 18px; display:flex; flex-direction:column; gap:6px}
-.tile .k{font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3)}
-.tile .v{font-family:"IBM Plex Mono",monospace; font-size:27px; font-weight:500; letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1.1}
-.tile .sub{font-size:12px; color:var(--ink-2)}
-.tile.is-fail .v{color:var(--fail)}
-.tile.is-warn .v{color:var(--warn)}
-.bar{height:4px; background:var(--sunken); border-radius:100px; overflow:hidden; margin-top:2px}
-.bar i{display:block; height:100%; background:var(--pass); border-radius:100px}
-.bar i.warn{background:var(--warn)}
-
-/* ---------- panels ---------- */
-.panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden}
-.panel-head{display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap}
-.panel-head h3{font-size:13px; font-weight:700}
-.panel-head .right{margin-left:auto; display:flex; align-items:center; gap:10px}
-
-/* ---------- pills ---------- */
-.pill{
-  display:inline-flex; align-items:center; gap:5px; flex:none;
-  font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:600;
-  letter-spacing:.07em; text-transform:uppercase;
-  padding:2.5px 7px; border-radius:3px; border:1px solid transparent; white-space:nowrap;
+/* — forms — */
+.field > label {
+  display: block; font-size: 12px; margin-bottom: 5px;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
 }
-.pill.pass{color:var(--pass); background:var(--pass-soft); border-color:color-mix(in srgb,var(--pass) 28%,transparent)}
-.pill.warn{color:var(--warn); background:var(--warn-soft); border-color:color-mix(in srgb,var(--warn) 30%,transparent)}
-.pill.fail{color:var(--fail); background:var(--fail-soft); border-color:color-mix(in srgb,var(--fail) 32%,transparent)}
-.pill.mute{color:var(--ink-2); background:var(--surface-2); border-color:var(--line-strong)}
-.pill.acc{color:var(--accent-ink); background:var(--accent-soft); border-color:color-mix(in srgb,var(--accent) 32%,transparent)}
-.tag{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3)}
-
-/* ---------- agent feed ---------- */
-.feed{display:flex; flex-direction:column}
-.ev{border-bottom:1px solid var(--line)}
-.ev:last-child{border-bottom:0}
-.ev summary{
-  display:grid; grid-template-columns:82px 1fr auto; gap:14px; align-items:center;
-  padding:11px 16px 11px 13px; cursor:pointer; list-style:none;
-  border-left:3px solid var(--line-strong);
+.input {
+  width: 100%; min-height: 36px; padding: 6px 10px; font: inherit;
+  font-size: 14px; color: var(--color-text); caret-color: var(--color-accent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
 }
-.ev summary::-webkit-details-marker{display:none}
-.ev summary:hover{background:var(--surface-2)}
-.ev[data-v="blocked"] summary{border-left-color:var(--fail)}
-.ev[data-v="allowed"] summary{border-left-color:var(--pass)}
-.ev[data-v="escalated"] summary{border-left-color:var(--warn)}
-.ev .when{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-3); font-variant-numeric:tabular-nums}
-.ev .what{min-width:0}
-.ev .what b{display:block; font-weight:600; font-size:13px; overflow-wrap:anywhere}
-.ev .what em{display:block; font-style:normal; font-size:12px; color:var(--ink-2); margin-top:1px; overflow-wrap:anywhere}
-.ev .flags{display:flex; gap:6px; align-items:center; flex-wrap:wrap; justify-content:flex-end}
-.ev-body{padding:2px 16px 16px 62px; display:grid; gap:12px}
-.kv{display:grid; grid-template-columns:118px 1fr; gap:4px 14px; font-size:12.5px}
-.kv dt{color:var(--ink-3); font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.04em; text-transform:uppercase; padding-top:2px}
-.kv dd{margin:0; color:var(--ink)}
-.payload{
-  background:var(--sunken); border:1px solid var(--line); border-left:3px solid var(--fail);
-  padding:10px 12px; border-radius:4px; font-family:"IBM Plex Mono",monospace;
-  font-size:12px; line-height:1.6; color:var(--ink-2); overflow-x:auto;
+.input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
+.input:focus-visible { border-color: var(--color-accent); outline-offset: 0; }
+textarea.input { min-height: 90px; resize: vertical; }
+.radio { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
+.radio input, .seg-opt input {
+  position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;
 }
-.payload .lbl{display:block; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--fail); margin-bottom:5px; font-weight:600}
-.chev{color:var(--ink-3); font-size:11px; transition:transform .15s ease}
-.ev[open] .chev{transform:rotate(90deg)}
-@media(prefers-reduced-motion:reduce){.chev{transition:none}}
-
-/* ---------- guardrails ---------- */
-.rails{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line)}
-.rail{background:var(--surface); padding:14px 16px; display:flex; flex-direction:column; gap:6px}
-.rail .name{font-family:"IBM Plex Mono",monospace; font-size:12.5px; font-weight:600; color:var(--accent-ink)}
-.rail .desc{font-size:12.5px; color:var(--ink-2)}
-.rail .foot{display:flex; align-items:center; gap:8px; margin-top:auto; padding-top:6px; flex-wrap:wrap}
-.count{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-3); font-variant-numeric:tabular-nums}
-
-/* ---------- queue ---------- */
-.queue{display:grid; gap:1px; background:var(--line)}
-.q{background:var(--surface); padding:14px 16px; display:grid; gap:9px}
-.q-top{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-.q-top .id{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink-3)}
-.q-q{font-weight:600; font-size:13.5px}
-.q-a{font-size:13px; color:var(--ink-2); background:var(--surface-2); border:1px solid var(--line); border-radius:4px; padding:10px 12px; max-width:78ch}
-.cites{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
-.cite{
-  font-family:"IBM Plex Mono",monospace; font-size:11px; padding:2px 6px; border-radius:3px;
-  border:1px solid var(--line-strong); color:var(--ink-2); background:var(--surface-2);
+.radio .dot {
+  width: 16px; height: 16px; flex: none; border-radius: 50%;
+  border: 1.5px solid var(--color-divider);
 }
-.cite.stale{color:var(--warn); border-color:color-mix(in srgb,var(--warn) 40%,transparent); background:var(--warn-soft)}
-.q-acts{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
-.btn{
-  border:1px solid var(--line-strong); background:var(--surface); color:var(--ink);
-  padding:5px 12px; border-radius:4px; font-size:12.5px; font-weight:600; cursor:pointer;
+.radio:hover .dot { border-color: var(--color-accent); }
+.radio input:checked + .dot {
+  border-color: var(--color-accent); background: var(--color-accent);
+  box-shadow: inset 0 0 0 4px var(--color-bg);
 }
-.btn:hover{background:var(--surface-2)}
-.btn.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-fg)}
-.btn.primary:hover{background:var(--accent-ink); border-color:var(--accent-ink)}
-.btn.ghost{border-color:var(--line-strong); color:var(--ink-2)}
-.btn:disabled{opacity:.45; cursor:default}
-.q.resolved{opacity:.5}
-.hint{font-size:12px; color:var(--ink-3)}
-
-/* ---------- framework tabs ---------- */
-.tabs{display:flex; gap:2px; border-bottom:1px solid var(--line); padding:0 8px; flex-wrap:wrap}
-.tab{
-  background:none; border:0; border-bottom:2px solid transparent; padding:11px 12px;
-  font-size:13px; font-weight:600; color:var(--ink-3); cursor:pointer;
+.radio input:focus-visible + .dot { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.seg {
+  display: inline-flex; overflow: hidden;
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
 }
-.tab[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--accent)}
-.tab:hover{color:var(--ink)}
-.tab .c{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3); margin-left:6px}
-.tbl-scroll{overflow-x:auto}
-table{width:100%; border-collapse:collapse; font-size:13px; min-width:720px}
-th{
-  text-align:left; font-size:10.5px; letter-spacing:.09em; text-transform:uppercase;
-  color:var(--ink-3); font-weight:600; padding:9px 14px; border-bottom:1px solid var(--line);
-  background:var(--surface-2); white-space:nowrap;
+.seg-opt {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; font-size: 13px; cursor: pointer;
 }
-td{padding:10px 14px; border-bottom:1px solid var(--line); vertical-align:top}
-tr:last-child td{border-bottom:0}
-td.id{font-family:"IBM Plex Mono",monospace; font-size:12px; white-space:nowrap; color:var(--ink)}
-td.num{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; color:var(--ink-2); white-space:nowrap}
-.rowname{font-weight:600}
-.rownote{font-size:12px; color:var(--ink-3); margin-top:2px}
+.seg-opt + .seg-opt { border-left: 1px solid var(--color-divider); }
+.seg-opt:has(input:checked) { background: var(--color-accent); color: var(--color-bg); }
+.seg-opt:not(:has(input:checked)):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.seg-opt:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: -2px; }
 
-/* ---------- split ---------- */
-.split{display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start}
-
-/* ---------- audit ---------- */
-.audit{display:flex; flex-direction:column}
-.au{display:grid; grid-template-columns:118px 1fr; gap:14px; padding:10px 16px; border-bottom:1px solid var(--line); font-size:12.5px}
-.au:last-child{border-bottom:0}
-.au .t{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-3); font-variant-numeric:tabular-nums}
-.au .d strong{font-weight:600}
-.au .d .who{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-3); display:block; margin-top:2px}
-.au.new{background:var(--accent-soft)}
-
-.callout{
-  border:1px solid color-mix(in srgb,var(--fail) 32%,transparent); background:var(--fail-soft);
-  border-radius:var(--radius); padding:12px 16px; display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap;
+/* — cards — */
+.card {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-surface);
 }
-.callout .txt{font-size:13px; color:var(--ink); max-width:72ch}
-.callout .txt b{color:var(--fail)}
-
-footer{border-top:1px solid var(--line); padding:20px 0 0; color:var(--ink-3); font-size:12px; display:flex; gap:16px; flex-wrap:wrap}
-
-@media(max-width:1000px){
-  .tiles{grid-template-columns:repeat(2,1fr)}
-  .rails{grid-template-columns:repeat(1,1fr)}
-  .split{grid-template-columns:1fr}
-  .sec-head .note{margin-left:0; text-align:left}
+.card-kicker { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent); }
+.card-title {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 17px; line-height: 1.2;
 }
-@media(max-width:640px){
-  .wrap{padding:0 14px}
-  .topbar-in{padding:10px 14px}
-  .tiles{grid-template-columns:1fr}
-  .ev summary{grid-template-columns:1fr; gap:6px}
-  .ev .flags{justify-content:flex-start}
-  .ev-body{padding-left:16px}
-  .kv{grid-template-columns:1fr}
-  .au{grid-template-columns:1fr; gap:2px}
+.card-body { margin: 0; font-size: 13px; opacity: 0.8; flex: 1; }
+.card-meta {
+  display: flex; align-items: center; gap: 6px; font-size: 11px;
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
 }
+.elev-sm { box-shadow: var(--shadow-sm); }
+.elev-md { box-shadow: var(--shadow-md); }
+.elev-lg { box-shadow: var(--shadow-lg); }
+
+/* — tags — */
+.tag {
+  display: inline-flex; align-items: center; font-size: 11px;
+  letter-spacing: 0.02em; padding: 3px 10px;
+  border-radius: calc(var(--radius-md) * 0.75);
+}
+.tag-accent { background: var(--color-accent-100); color: var(--color-accent-800); }
+.tag-accent-2 { background: var(--color-accent-2-100); color: var(--color-accent-2-800); }
+.tag-neutral { background: var(--color-neutral-100); color: var(--color-neutral-800); }
+.tag-outline { border: 1px solid var(--color-accent); color: var(--color-accent); }
+
+/* — navigation — */
+.nav {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 2px solid var(--color-divider);
+}
+.nav-brand {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 18px; margin-right: auto;
+}
+.nav a { color: inherit; text-decoration: none; font-size: 14px; }
+.nav a:hover, .nav a[aria-current='page'] { color: var(--color-accent); }
+
+/* — tables — */
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th {
+  text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  padding: var(--space-2); border-bottom: 2px solid var(--color-divider);
+}
+.table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-divider);
+}
+.table tbody tr:hover { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
+
+/* — dialog — */
+.dialog-backdrop {
+  position: fixed; inset: 0; display: grid; place-items: center;
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--color-neutral-900) 50%, transparent);
+}
+.dialog {
+  width: min(440px, 100%); display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-4); border-radius: var(--radius-lg);
+  background: var(--color-surface); box-shadow: var(--shadow-lg);
+}
+.dialog-title {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 20px;
+}
+.dialog-body { font-size: 14px; opacity: 0.85; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
+
+
 </style>
 </head>
-<body style="margin:0">
+<body>
 <style>
-/* app-only additions */
-.toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:10px 16px; border-bottom:1px solid var(--line); background:var(--surface-2)}
-.toolbar .lbl{font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); margin-right:4px}
-.btn.danger{border-color:color-mix(in srgb,var(--fail) 45%,transparent); color:var(--fail)}
-.btn.danger:hover{background:var(--fail-soft)}
-.btn.sm{padding:4px 9px; font-size:12px}
-textarea,input[type=text],select{
-  font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--line-strong);
-  border-radius:4px; padding:7px 9px; font-size:13px;
-}
-textarea{width:100%; min-height:74px; resize:vertical; font-family:"IBM Plex Mono",monospace; font-size:12px; line-height:1.5}
-.paste{padding:12px 16px; border-bottom:1px solid var(--line); display:grid; gap:8px}
-.paste-row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
-.ask{display:grid; grid-template-columns:1fr auto; gap:8px; padding:12px 16px; border-bottom:1px solid var(--line); background:var(--surface-2)}
-.ask .controls{display:flex; gap:6px; flex-wrap:wrap; grid-column:1 / -1}
-.chk{display:inline-flex; align-items:center; gap:5px; font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-2); border:1px solid var(--line-strong); border-radius:3px; padding:3px 7px; cursor:pointer; background:var(--surface)}
-.chk:has(input:checked){border-color:var(--accent); color:var(--accent-ink); background:var(--accent-soft)}
-.chk input{margin:0}
-.q-a.blocked{border-left:3px solid var(--fail)}
-.toast{position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:var(--ink); color:var(--ground); padding:9px 14px; border-radius:6px; font-size:13px; box-shadow:var(--shadow); z-index:50}
-.empty{padding:22px 16px; color:var(--ink-3); font-size:13px}
-select.persona{padding:4px 8px; font-size:12px; font-weight:600}
-.grants{display:flex; gap:4px; flex-wrap:wrap}
-.grants .pill{font-size:9.5px; padding:1.5px 5px}
-.sig{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3)}
-.sig b{color:var(--ink-2); font-weight:500}
-@media(max-width:640px){.ask{grid-template-columns:1fr}}
+/* ── Attest Console — implementation of design/Attest Console.dc.html on the Modernist system ── */
+@keyframes attestTick { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+@media (prefers-reduced-motion: reduce) { .tick i { animation: none } }
+.console{min-height:100vh;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);font-size:15px;line-height:1.55}
+.k{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--color-neutral-700)}
+.k2{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-700)}
+.tabnum{font-variant-numeric:tabular-nums}
+
+/* header */
+.hdr{display:flex;align-items:center;column-gap:20px;row-gap:8px;padding:12px 24px;border-bottom:2px solid var(--color-divider);background:var(--color-bg);position:sticky;top:0;z-index:20;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:10px;white-space:nowrap}
+.brand b{font-family:var(--font-heading);font-weight:800;font-size:20px;letter-spacing:-.02em}
+.brand span{font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--color-neutral-700)}
+.hdr-meta{display:flex;align-items:center;column-gap:16px;row-gap:6px;margin-left:auto;flex-wrap:wrap}
+.tick{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-700);white-space:nowrap}
+.tick i{width:7px;height:7px;background:var(--color-accent);animation:attestTick 2.6s ease-in-out infinite}
+.tick.off i{background:var(--color-neutral-400);animation:none}
+.stamp{font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--color-neutral-700);font-variant-numeric:tabular-nums;white-space:nowrap}
+.persona{font:inherit;font-size:12px;font-weight:600;letter-spacing:.02em;padding:5px 8px;border:1px solid var(--color-divider);background:var(--color-bg);color:var(--color-text);border-radius:0;max-width:34ch}
+.grants{display:inline-flex;gap:4px;flex-wrap:wrap}
+.hdr .btn{font-size:12px;padding:6px 12px;white-space:nowrap}
+
+/* tags (design: TAG + T.*) */
+.t{display:inline-flex;align-items:center;padding:2px 8px;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;white-space:nowrap;border:1px solid var(--color-divider);color:var(--color-text)}
+.t.ink{border-color:var(--color-text);background:var(--color-text);color:var(--color-bg)}
+.t.red{border-color:var(--color-accent);background:var(--color-accent);color:#fff}
+.t.quiet{border-color:var(--color-neutral-300);color:var(--color-neutral-700)}
+
+/* demo drawer */
+.drawer{border-bottom:2px solid var(--color-divider);background:var(--color-neutral-100);padding:16px 24px;display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
+.drawer .lead{min-width:200px;max-width:34ch}
+.drawer .lead p{margin:0;font-size:13px;color:var(--color-neutral-800)}
+.drawer .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.drawer .acts .btn{font-size:13px}
+.btn.danger{border-color:var(--color-accent);color:var(--color-accent-700)}
+.paste{flex:1 1 360px;display:grid;gap:8px;min-width:0}
+.paste textarea{width:100%;min-height:64px;resize:vertical;font-family:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--color-divider);background:var(--color-bg);color:var(--color-text);border-radius:0}
+.paste .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.paste input{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--color-divider);background:var(--color-bg);color:var(--color-text);border-radius:0;width:220px}
+.hint{font-size:13px;color:var(--color-neutral-700)}
+
+/* shell + rail */
+.shell{display:flex;align-items:stretch;flex-wrap:wrap}
+.rail{flex:0 0 212px;border-right:2px solid var(--color-divider);padding:14px 0 32px;align-self:stretch}
+.navbtn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;font-family:inherit;cursor:pointer;padding:11px 20px;border:0;border-left:4px solid transparent;background:transparent;color:var(--color-neutral-800)}
+.navbtn:hover{background:var(--color-neutral-100)}
+.navbtn[aria-current="page"]{border-left-color:var(--color-accent);background:var(--color-neutral-100);color:var(--color-text)}
+.navbtn .top{display:flex;align-items:baseline;gap:8px;white-space:nowrap}
+.navbtn .num{font-size:11px;font-weight:600;letter-spacing:.1em;color:var(--color-neutral-700);font-variant-numeric:tabular-nums}
+.navbtn .lbl{font-family:var(--font-heading);font-weight:800;font-size:14px;letter-spacing:.02em;text-transform:uppercase}
+.navbtn .meta{font-size:12px;font-weight:600;letter-spacing:.04em;padding-left:26px;white-space:nowrap;color:var(--color-neutral-700)}
+.navbtn .meta.red{color:var(--color-accent-700)}
+.rail .cat{padding:16px 20px 0;margin-top:10px;border-top:2px solid var(--color-divider)}
+.rail .cat div{font-size:13px;color:var(--color-neutral-800);font-variant-numeric:tabular-nums}
+main.view{flex:1 1 520px;padding:32px 32px 80px;min-width:0;max-width:1200px}
+.view-head{margin-bottom:22px}
+.view-head h2{margin:6px 0 6px;font-size:32px}
+.view-head p{margin:0;font-size:15px;color:var(--color-neutral-800);max-width:66ch}
+
+/* 01 posture */
+.poster{background:var(--color-accent);color:#fff;padding:26px 26px 24px}
+.poster .k{color:#fff}
+.poster .big{font-family:var(--font-heading);font-weight:800;font-size:42px;line-height:1.04;letter-spacing:-.02em;margin:12px 0 10px;max-width:24ch;text-wrap:balance}
+.poster p{margin:0 0 18px;font-size:15px;max-width:64ch}
+.poster .cta{background:#fff;color:var(--color-accent-700);border:0;font-family:var(--font-heading);font-weight:800;font-size:14px;padding:11px 16px;cursor:pointer;white-space:nowrap}
+.poster .cta:hover{color:var(--color-accent)}
+.cells{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:2px;background:var(--color-divider);border:2px solid var(--color-divider);margin-bottom:34px}
+.cells.under{border-top:0}
+.cell{background:var(--color-bg);padding:18px 20px;display:flex;flex-direction:column;gap:8px}
+.val{font-family:var(--font-heading);font-weight:800;font-size:38px;line-height:1.05;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.val.red{color:var(--color-accent)}
+.bar{height:4px;background:var(--color-neutral-300)}
+.bar i{display:block;height:100%;background:var(--color-text)}
+.cell .sub{font-size:13px;color:var(--color-neutral-800)}
+.sec-h{display:flex;align-items:baseline;gap:12px;border-bottom:2px solid var(--color-divider);padding-bottom:8px;flex-wrap:wrap}
+.sec-h h4{margin:0;font-size:20px}
+.sec-h .right{margin-left:auto}
+.tbl-wrap{overflow-x:auto}
+table.grid{width:100%;border-collapse:collapse;min-width:700px}
+.grid th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-700);padding:10px 14px;border-bottom:1px solid var(--color-divider)}
+.grid.strong th{border-bottom-width:2px}
+.grid td{padding:12px 14px;border-bottom:1px solid var(--color-divider);vertical-align:top}
+.grid th:first-child,.grid td:first-child{padding-left:0}
+.grid th:last-child,.grid td:last-child{padding-right:0}
+.grid tbody tr:hover{background:color-mix(in srgb,var(--color-text) 4%,transparent)}
+.idc{font-weight:600;font-size:14px;letter-spacing:.02em;white-space:nowrap}
+.idc.fail{color:var(--color-accent-700)}
+.rowname{font-weight:600}
+.rowcid{font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--color-neutral-700);margin-top:2px}
+.rownote{font-size:13px;color:var(--color-neutral-700);margin-top:3px;max-width:70ch}
+.num{font-size:13px;color:var(--color-neutral-800);font-variant-numeric:tabular-nums;white-space:nowrap}
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--color-neutral-700)}
+.legend.col{display:grid;gap:4px}
+
+/* 02 agent */
+.feed{border-bottom:2px solid var(--color-divider);margin-bottom:36px}
+.ev{border-bottom:1px solid var(--color-divider)}
+.evbtn{display:grid;grid-template-columns:76px minmax(0,1fr) auto;gap:16px;align-items:center;width:100%;text-align:left;background:none;border:0;font-family:inherit;color:inherit;cursor:pointer;padding:16px 12px 16px 16px;border-left:4px solid var(--color-neutral-300)}
+.evbtn:hover{background:var(--color-neutral-100)}
+.ev[data-v="blocked"] .evbtn{border-left-color:var(--color-accent)}
+.ev[data-v="declined"] .evbtn,.ev[data-v="escalated"] .evbtn{border-left-color:var(--color-text)}
+.ev .when{font-size:13px;font-weight:600;color:var(--color-neutral-700);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ev .what{min-width:0;display:block}
+.ev .ttl{display:block;font-family:var(--font-heading);font-weight:800;font-size:15px;line-height:1.25;overflow-wrap:anywhere}
+.ev .sub{display:block;font-size:13px;color:var(--color-neutral-700);margin-top:2px;overflow-wrap:anywhere}
+.ev .flags{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.ev .chev{font-size:15px;font-weight:800;color:var(--color-neutral-700);width:14px;text-align:right}
+.evbody{padding:2px 0 22px 20px;margin-left:16px;border-left:2px solid var(--color-divider);display:grid;gap:16px;max-width:96ch}
+.payload{border-left:4px solid var(--color-accent);background:var(--color-neutral-100);padding:12px 16px;white-space:pre-wrap;font-size:13px;line-height:1.65;color:var(--color-neutral-900)}
+.payload .lbl{display:block;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:6px}
+.kv{display:grid;grid-template-columns:126px minmax(0,1fr);gap:8px 18px;margin:0;font-size:14px}
+.kv dt{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--color-neutral-700);padding-top:3px}
+.kv dd{margin:0}
+.kv dd.strong{font-weight:600;letter-spacing:.02em}
+.rails{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-bottom:0}
+.rails .name{font-family:var(--font-heading);font-weight:800;font-size:15px;letter-spacing:.01em;color:var(--color-accent-700)}
+.rails p{margin:0;font-size:13px;color:var(--color-neutral-900)}
+.rails .foot{display:flex;align-items:center;gap:10px;margin-top:auto;padding-top:12px;flex-wrap:wrap}
+.count{font-size:12px;font-weight:600;letter-spacing:.04em;font-variant-numeric:tabular-nums;color:var(--color-neutral-700)}
+.count.red{color:var(--color-accent-700)}
+
+/* 03 approvals */
+.draft{border:2px solid var(--color-divider);padding:18px 20px;margin-bottom:30px;display:grid;gap:14px}
+.draft .row{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch}
+.draft .input{flex:1 1 340px;min-width:0;font-family:inherit;font-size:14px;padding:10px 12px;border:1px solid var(--color-divider);background:var(--color-bg);color:var(--color-text);border-radius:0}
+.draft .btn-primary{justify-content:flex-start;padding:10px 16px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{font-family:inherit;font-size:12px;font-weight:600;letter-spacing:.03em;padding:4px 9px;cursor:pointer;border:1px solid var(--color-neutral-300);background:var(--color-bg);color:var(--color-neutral-800)}
+.chip:hover{border-color:var(--color-neutral-500)}
+.chip[aria-pressed="true"]{border-color:var(--color-accent);background:var(--color-accent);color:#fff}
+.chip.llm{margin-left:auto;display:inline-flex;align-items:center;gap:6px}
+.chip.llm input{margin:0}
+.chip.llm[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
+.draft p{margin:0;font-size:13px;color:var(--color-neutral-700);max-width:76ch}
+.queue{border-bottom:2px solid var(--color-divider)}
+.q{padding:22px 0;border-bottom:1px solid var(--color-divider);display:grid;gap:12px}
+.q.resolved{opacity:.5}
+.q .top{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.q .qid{font-size:13px;font-weight:600;letter-spacing:.04em;color:var(--color-neutral-700);font-variant-numeric:tabular-nums}
+.q h5{margin:0;font-size:18px;max-width:70ch}
+.qbody{font-size:14px;line-height:1.6;color:var(--color-neutral-900);background:var(--color-neutral-100);padding:14px 16px;max-width:88ch;border-left:4px solid var(--color-neutral-300)}
+.qbody.red{border-left-color:var(--color-accent)}
+.cites{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.cite{display:inline-flex;align-items:center;padding:2px 8px;font-size:12px;font-weight:600;letter-spacing:.02em;white-space:nowrap;border:1px solid var(--color-neutral-300);color:var(--color-neutral-800)}
+.cite.stale{border-color:var(--color-accent);color:var(--color-accent-700)}
+.q .acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.q .acts .btn{justify-content:flex-start}
+.q .acts .hint{max-width:60ch}
+.sig{font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--color-neutral-700);font-variant-numeric:tabular-nums}
+.foot-note{margin:14px 0 0;font-size:13px;color:var(--color-neutral-700);max-width:70ch}
+
+/* 04 frameworks */
+.tabs{display:flex;gap:2px;background:var(--color-divider);border:2px solid var(--color-divider);margin-bottom:20px;flex-wrap:wrap}
+.tab{flex:1 1 200px;text-align:left;padding:14px 18px;border:0;cursor:pointer;font-family:inherit;background:var(--color-bg);color:var(--color-text)}
+.tab:hover{background:var(--color-neutral-100)}
+.tab[aria-selected="true"]{background:var(--color-accent);color:#fff}
+.tab .l{display:block;font-family:var(--font-heading);font-weight:800;font-size:15px}
+.tab .c{display:block;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-top:3px;color:var(--color-neutral-700)}
+.tab[aria-selected="true"] .c{color:rgba(255,255,255,.85)}
+.gapline{border-left:4px solid var(--color-accent);padding:10px 0 10px 14px;margin-bottom:20px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.gapline b{font-family:var(--font-heading);font-weight:800;font-size:15px;color:var(--color-accent-700)}
+.gapline span{font-size:13px;color:var(--color-neutral-800);max-width:66ch}
+.gapline.ok{border-left-color:var(--color-text)}
+.gapline.ok b{color:var(--color-text)}
+
+/* 05 ledger */
+.ledger{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:34px;align-items:start}
+.ledger .grid{min-width:500px}
+.au{display:grid;grid-template-columns:84px minmax(0,1fr);gap:14px;padding:13px 0;border-bottom:1px solid var(--color-divider)}
+.au.new{border-left:4px solid var(--color-accent);padding-left:12px}
+.au .when{font-size:13px;font-weight:600;color:var(--color-neutral-700);font-variant-numeric:tabular-nums;white-space:nowrap}
+.au .head{display:block;font-weight:600;font-size:14px;overflow-wrap:anywhere}
+.au .who{display:block;font-size:12px;color:var(--color-neutral-700);margin-top:2px;overflow-wrap:anywhere}
+.chainpill{margin-left:auto;padding:2px 8px;background:var(--color-text);color:var(--color-bg);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+.chainpill.broken{background:var(--color-accent);color:#fff}
+
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--color-text);color:var(--color-bg);padding:9px 14px;font-size:13px;z-index:50;box-shadow:var(--shadow-md)}
+.empty{padding:22px 0;color:var(--color-neutral-700);font-size:13px}
+@media (max-width:760px){ .rail{flex:1 1 100%;border-right:0;border-bottom:2px solid var(--color-divider);padding:0} .rail .cat{display:none} main.view{padding:24px 16px 60px} .evbtn{grid-template-columns:1fr} .ev .flags{justify-content:flex-start} .kv{grid-template-columns:1fr} }
 </style>
 
-<header class="topbar">
-  <div class="topbar-in">
-    <div class="mark"><b>Attest</b><span>Control Plane</span></div>
-    <div class="topbar-meta">
-      <label class="tick" for="persona">acting as</label>
+<div class="console">
+  <header class="hdr">
+    <div class="brand"><b>ATTEST</b><span>Control plane</span></div>
+    <div class="hdr-meta">
+      <span class="tick" id="tick"><i></i> Collectors healthy</span>
+      <span class="stamp">State as of <span id="stamp">…</span></span>
+      <label class="k2" for="persona" style="letter-spacing:.06em">Acting as</label>
       <select class="persona" id="persona" aria-label="Acting as"></select>
       <span class="grants" id="grants"></span>
-      <span class="env">local demo &middot; live</span>
-      <span class="tick"><i class="dot"></i> collectors healthy &middot; state as of <span class="mono" id="hdr-ts">…</span></span>
+      <span class="t">Local demo</span>
+      <button type="button" class="btn btn-secondary" id="drawer-btn" aria-expanded="false" aria-controls="drawer">Demo actions</button>
+    </div>
+  </header>
+
+  <div class="drawer" id="drawer" hidden>
+    <div class="lead">
+      <div class="k" style="margin-bottom:6px">Demo actions</div>
+      <p>Each button calls the real agent layer against the real store. Nothing here is scripted.</p>
+    </div>
+    <div class="acts">
+      <button type="button" class="btn btn-secondary" data-do="read-injected">Read vendor SOC 2 report — contains injection</button>
+      <button type="button" class="btn btn-secondary" data-do="read-clean">Read clean vendor report</button>
+      <button type="button" class="btn btn-secondary danger" data-do="read-misconfigured">Start reader with a write tool</button>
+      <button type="button" class="btn btn-secondary" data-do="ask-13">Ask about 13 controls at once</button>
+      <button type="button" class="btn btn-secondary danger" data-do="tamper">Tamper with a record</button>
+      <button type="button" class="btn btn-secondary" data-do="reseed">Reset demo</button>
+    </div>
+    <div class="paste">
+      <textarea id="paste" placeholder="Paste any document text — a vendor questionnaire, an RFP paragraph, a PDF excerpt. Try slipping an instruction into it."></textarea>
+      <div class="row">
+        <input type="text" id="paste-id" placeholder="document id (optional)">
+        <button type="button" class="btn btn-primary" data-do="read-pasted" style="justify-content:flex-start">Read pasted document</button>
+        <span class="hint">Read in an isolated context: no write-capable tools registered.</span>
+      </div>
     </div>
   </div>
-</header>
 
-<main class="wrap">
+  <div class="shell">
+    <nav class="rail" aria-label="Console views" id="rail"></nav>
 
-  <section>
-    <div class="sec-head">
-      <span class="eyebrow">01 / posture</span>
-      <h2>Continuous control state</h2>
-      <p class="note">Evidence outside its freshness SLA is not counted as passing. A control with no recent evidence is a failing control, not an untested one.</p>
-    </div>
-    <div class="tiles" id="tiles"></div>
-  </section>
-
-  <section>
-    <div class="sec-head">
-      <span class="eyebrow">02 / agent layer</span>
-      <h2>Governed agent activity</h2>
-      <p class="note">Agents draft. Humans decide. Every action below ran against the real evidence store and was written to the real audit log.</p>
-    </div>
-
-    <div class="panel" style="margin-bottom:18px">
-      <div class="panel-head">
-        <h3>Enforcement feed</h3>
-        <span class="tag" id="feed-count"></span>
+    <main class="view">
+      <div class="view-head">
+        <div class="k" style="letter-spacing:.14em" id="view-eyebrow"></div>
+        <h2 id="view-title"></h2>
+        <p id="view-note"></p>
       </div>
-      <div class="toolbar">
-        <span class="lbl">Reader agent</span>
-        <button class="btn sm" data-do="read-injected">Read vendor SOC 2 report (contains injection)</button>
-        <button class="btn sm" data-do="read-clean">Read clean vendor report</button>
-        <button class="btn sm danger" data-do="read-misconfigured">Start reader with a write tool</button>
-        <span class="lbl" style="margin-left:10px">Answer agent</span>
-        <button class="btn sm" data-do="ask-13">Ask about 13 controls at once</button>
-      </div>
-      <div class="paste">
-        <textarea id="paste" placeholder="Paste any document text here — a vendor questionnaire, an RFP paragraph, a PDF excerpt. Try slipping an instruction into it."></textarea>
-        <div class="paste-row">
-          <input type="text" id="paste-id" placeholder="document id (optional)" style="width:240px">
-          <button class="btn sm primary" data-do="read-pasted">Read pasted document</button>
-          <span class="hint">Read in an isolated context: no write-capable tools registered.</span>
-        </div>
-      </div>
-      <div class="feed" id="feed"></div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-head">
-        <h3>Guardrail policy</h3>
-        <span class="tag">6 rules &middot; enforced in <span class="mono">attest/guardrails.py</span> &middot; counts are from this session</span>
-      </div>
-      <div class="rails" id="rails"></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="sec-head">
-      <span class="eyebrow">03 / human decision</span>
-      <h2>Awaiting approval</h2>
-      <p class="note">Nothing here has left the building. Approving records a named human against the claim &mdash; "an agent did it" is not an auditable answer.</p>
-    </div>
-    <div class="panel">
-      <div class="panel-head">
-        <h3>Customer questionnaire drafts</h3>
-        <span class="tag">Northwind Data Systems &middot; security review</span>
-        <div class="right"><span id="sig-status"></span><span class="pill acc" id="q-count"></span></div>
-      </div>
-      <form class="ask" id="ask">
-        <input type="text" id="ask-q" placeholder="Type a customer question, e.g. Do you log administrative actions?">
-        <button class="btn primary" type="submit">Draft answer</button>
-        <div class="controls" id="ask-controls"></div>
-        <div class="controls"><label class="chk" id="llm-wrap"><input type="checkbox" id="ask-llm"> draft with Claude (claude-opus-5), then validate with the same guardrails</label><span class="hint" id="llm-hint"></span></div>
-      </form>
-      <div class="queue" id="queue"></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="sec-head">
-      <span class="eyebrow">04 / frameworks</span>
-      <h2>One control catalog, three frameworks</h2>
-      <p class="note">Controls are tested once. Results are mapped outward, so a single gap surfaces everywhere it applies instead of being rediscovered per audit.</p>
-    </div>
-    <div class="callout" style="margin-bottom:14px" id="callout"></div>
-    <div class="panel">
-      <div class="tabs" role="tablist" id="tabs"></div>
-      <div class="tbl-scroll" id="fw-table"></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="sec-head">
-      <span class="eyebrow">05 / ledger</span>
-      <h2>Evidence store and audit trail</h2>
-      <p class="note">Append-only and hash-chained. The agent layer can read it and propose against it; it cannot rewrite it.</p>
-    </div>
-    <div class="split">
-      <div class="panel">
-        <div class="panel-head">
-          <h3>Evidence records</h3>
-          <span class="tag" id="ev-count"></span>
-          <div class="right">
-            <span id="chain"></span>
-            <button class="btn sm danger" data-do="tamper" title="Edit one byte of the evidence file on disk">Tamper with a record</button>
-            <button class="btn sm" data-do="reseed">Reset demo</button>
-          </div>
-        </div>
-        <div class="tbl-scroll"><table style="min-width:560px" id="ev-table"></table></div>
-      </div>
-      <div class="panel">
-        <div class="panel-head"><h3>Audit trail</h3><span class="tag">actor &middot; model version &middot; approver</span></div>
-        <div class="audit" id="audit"></div>
-      </div>
-    </div>
-  </section>
-
-  <footer>
-    <span>Attest &middot; proof-of-concept</span>
-    <span>Seeded with representative data. Every action on this page runs real code against it.</span>
-    <span class="mono">catalog v2026.09 &middot; SOC 2 TSC &middot; ISO/IEC 27001:2022 &middot; 45 CFR Part 164 Subpart C</span>
-  </footer>
-</main>
+      <section id="v-posture"></section>
+      <section id="v-agent" hidden></section>
+      <section id="v-approvals" hidden></section>
+      <section id="v-frameworks" hidden></section>
+      <section id="v-ledger" hidden></section>
+    </main>
+  </div>
+</div>
 
 <script>
 (function(){
   "use strict";
-  var S = null, fw = "soc2", openKeys = new Set();
+  var S = null, view = "posture", fw = null, openKey = null, drawer = false, picked = [];
   var $ = function(s){ return document.querySelector(s); };
   var h = function(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); };
-  var VERDICT = {blocked:"fail", allowed:"pass", escalated:"warn", declined:"warn"};
-  var STATE = {PASS:"pass", DEGRADED:"warn", FAIL:"fail"};
-  var STATE_LABEL = {PASS:"pass", DEGRADED:"degraded", FAIL:"fail"};
+  var VIEWS = [
+    { id:"posture", num:"01", label:"Posture", eyebrow:"01 / posture", title:"Continuous control state", note:"Evidence outside its freshness SLA is not counted as passing. A control with no recent evidence is a failing control, not an untested one." },
+    { id:"agent", num:"02", label:"Agent layer", eyebrow:"02 / agent layer", title:"Governed agent activity", note:"Agents draft, humans decide. Every action ran against the real evidence store and was written to the real audit log." },
+    { id:"approvals", num:"03", label:"Approvals", eyebrow:"03 / human decision", title:"Awaiting approval", note:"Nothing here has left the building. Approval records a named human against the claim." },
+    { id:"frameworks", num:"04", label:"Frameworks", eyebrow:"04 / frameworks", title:"One catalog, three frameworks", note:"Controls are tested once and mapped outward, so a single gap surfaces everywhere it applies instead of being rediscovered per audit." },
+    { id:"ledger", num:"05", label:"Ledger", eyebrow:"05 / ledger", title:"Evidence store and audit trail", note:"Append-only and hash-chained. The agent layer can read it and propose against it; it cannot rewrite it." }
+  ];
+  var STATE_TAG = { PASS:"", DEGRADED:"ink", FAIL:"red" }, STATE_RANK = { FAIL:0, DEGRADED:1, PASS:2 };
+  var VERDICT_TAG = { blocked:"red", allowed:"", declined:"ink", escalated:"ink" };
+  var CLASS_TAG = { publishable:"quiet", internal:"", restricted:"red" };
   var RULES = [
     ["untrusted-doc-isolation","LLM01","Vendor reports, RFPs and questionnaires are read in a context with no write-capable tools registered. Reading and acting are separate passes with separate privileges."],
-    ["tool-allowlist","LLM06","Tools are declared explicitly. MCP servers pinned by version, tool definitions reviewed in code review like any dependency. No dynamic tool loading at runtime."],
+    ["tool-allowlist","LLM06","Tools are declared explicitly, MCP servers pinned by version, definitions reviewed in code review like any dependency. No dynamic tool loading at runtime."],
     ["citation-required","grounding","Every generated claim must resolve to an evidence_id in the store. Claims without one are rejected before they reach a reviewer."],
     ["egress-classification-gate","LLM02","Evidence is classified at ingest. Customer-facing agents query the publishable set only — a boundary on retrieval, not a post-hoc filter."],
     ["max-steps","LLM06","Hard cap of 12 tool calls per task. The agent cannot extend its own budget; exhaustion is reported with partial work, never silently truncated."],
-    ["requester-scoped-identity","authz","The agent inherits the requesting user's grants, never the service account's. Closes the confused-deputy path where an agent does what its requester could not."]
+    ["requester-scoped-identity","authz","The agent inherits the requesting user's grants, never the service account's. Closes the confused-deputy path."]
   ];
+  var FW_SHORT = { soc2:"SOC 2", iso27001:"ISO/IEC", hipaa:"HIPAA" };
 
-  function toast(msg){
-    var t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
-    document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 2600);
-  }
+  /* ---------- transport (persona travels as a header; the agent inherits its grants) ---------- */
   var persona = (function(){ try { return localStorage.getItem("attest.persona") || "security-engineer"; } catch(e){ return "security-engineer"; } })();
   function hdrs(){ return {"Content-Type":"application/json", "X-Attest-User": persona}; }
+  function toast(msg){ var t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 2800); }
   function api(path, body){
     return fetch(path, {method:"POST", headers:hdrs(), body:JSON.stringify(body || {})})
       .then(function(r){ return r.json().then(function(j){
@@ -448,150 +539,194 @@ select.persona{padding:4px 8px; font-size:12px; font-weight:600}
   }
   function load(){ return fetch("/api/state", {headers:hdrs()}).then(function(r){ return r.json(); }).then(function(j){ S = j; render(); }); }
 
-  /* ---------- renderers ---------- */
-  function tiles(){
-    var s = S.summary, blocked = S.events.filter(function(e){ return e.verdict === "blocked"; }).length;
-    var pct = s.total ? Math.round(100 * s.pass / s.total) : 0;
-    var fpct = S.evidence_total ? (100 * S.evidence_fresh / S.evidence_total) : 0;
-    $("#tiles").innerHTML =
-      '<div class="tile"><span class="k">Controls passing</span><span class="v">' + s.pass + '<span style="font-size:16px;color:var(--ink-3)">/' + s.total + '</span></span><div class="bar"><i style="width:' + pct + '%"></i></div><span class="sub">' + s.degraded + ' degraded &middot; ' + s.fail + ' failing across 3 frameworks</span></div>' +
-      '<div class="tile' + (fpct < 100 ? ' is-warn' : '') + '"><span class="k">Evidence within SLA</span><span class="v">' + fpct.toFixed(1) + '%</span><div class="bar"><i class="' + (fpct < 100 ? 'warn' : '') + '" style="width:' + fpct + '%"></i></div><span class="sub">' + (S.evidence_total - S.evidence_fresh) + ' of ' + S.evidence_total + ' records stale</span></div>' +
-      '<div class="tile"><span class="k">Agent actions this session</span><span class="v">' + S.events.length + '</span><span class="sub">reader + answer agents, real calls</span></div>' +
-      '<div class="tile is-fail"><span class="k">Blocked by guardrails</span><span class="v">' + blocked + '</span><span class="sub">enforced in code, not in prompts</span></div>';
+  /* ---------- derived ---------- */
+  function sla(hours){ return hours >= 48 ? (hours/24) + "d" : hours + "h"; }
+  function gap(){ /* the control that fails in the most frameworks, with the ids it fails */
+    var by = {};
+    Object.keys(S.posture).forEach(function(id){ S.posture[id].forEach(function(r){ if(r.state === "FAIL"){ (by[r.control_id] = by[r.control_id] || []).push({fw:id, id:r.framework_id}); } }); });
+    var best = null; Object.keys(by).forEach(function(c){ if(!best || by[c].length > by[best].length) best = c; });
+    if(!best) return null;
+    var ctl = S.controls.filter(function(c){ return c.id === best; })[0] || {id:best, name:best, reason:""};
+    return { control: ctl, hits: by[best] };
   }
+  function fwName(id, fid){ return (id === "hipaa" ? "§" : "") + fid; }
 
-  function feed(){
-    document.querySelectorAll("#feed .ev[open]").forEach(function(d){ openKeys.add(d.dataset.key); });
-    var first = S.events.length ? S.events[0].ts + S.events[0].title : null;
-    $("#feed-count").textContent = "this session · " + S.events.length + " events";
-    $("#feed").innerHTML = S.events.length ? S.events.map(function(e, i){
-      var key = e.ts + e.title, open = openKeys.has(key) || (i === 0 && !openKeys.size);
-      var tags = e.tags.map(function(t){ return '<span class="pill mute">' + h(t) + '</span>'; }).join("");
-      var kv = "";
-      if(e.rule) kv += '<dt>Rule</dt><dd class="mono">' + h(e.rule) + '</dd>';
-      if(e.enforcement) kv += '<dt>Enforcement</dt><dd>' + h(e.enforcement) + '</dd>';
-      if(e.disposition) kv += '<dt>Disposition</dt><dd>' + h(e.disposition) + '</dd>';
-      if(e.identity) kv += '<dt>Identity</dt><dd class="mono">' + h(e.identity) + '</dd>';
-      return '<details class="ev" data-v="' + h(e.verdict) + '" data-key="' + h(key) + '"' + (open ? ' open' : '') + '>' +
-        '<summary><span class="when">' + h(e.ts.slice(11)) + '</span><span class="what"><b>' + h(e.title) + '</b><em>' + h(e.sub) + '</em></span>' +
-        '<span class="flags"><span class="pill ' + VERDICT[e.verdict] + '">' + h(e.verdict) + '</span>' + tags + '<span class="chev">&#9656;</span></span></summary>' +
-        '<div class="ev-body">' + (e.payload ? '<div class="payload"><span class="lbl">untrusted document content &mdash; quoted, never executed</span>' + h(e.payload) + '</div>' : '') +
-        '<dl class="kv">' + kv + '</dl></div></details>';
-    }).join("") : '<p class="empty">No agent activity yet.</p>';
+  /* ---------- header + rail ---------- */
+  function header(){
+    $("#stamp").textContent = S.generated_at.replace("T", " · ").replace(/Z$/, "Z");
+    var tick = $("#tick"); tick.className = "tick" + (S.chain_intact ? "" : " off"); tick.innerHTML = "<i></i> " + (S.chain_intact ? "Collectors healthy" : "Ledger integrity failure");
+    $("#persona").innerHTML = S.personas.map(function(p){ return '<option value="' + h(p.id) + '"' + (p.id === S.identity.persona ? ' selected' : '') + '>' + h(p.label) + ' · ' + h(p.user) + '</option>'; }).join("");
+    $("#grants").innerHTML = S.identity.grants.map(function(g){ return '<span class="t ' + (g.indexOf("approve") === 0 ? 'ink' : 'quiet') + '">' + h(g) + '</span>'; }).join("");
+    var d = $("#drawer"); d.hidden = !drawer; $("#drawer-btn").setAttribute("aria-expanded", String(drawer)); $("#drawer-btn").textContent = drawer ? "Hide demo actions" : "Demo actions";
   }
-
-  function rails(){
-    $("#rails").innerHTML = RULES.map(function(r){
-      var n = S.rules[r[0]] || 0;
-      return '<div class="rail"><span class="name">' + r[0] + '</span><span class="desc">' + r[2] + '</span><span class="foot"><span class="pill mute">' + r[1] + '</span><span class="count">' + n + ' enforced this session</span></span></div>';
-    }).join("");
-  }
-
-  function queue(){
+  function rail(){
     var pending = S.queue.filter(function(q){ return !q.decision; }).length;
-    var c = $("#q-count"); c.textContent = pending ? pending + " pending" : "queue clear"; c.className = pending ? "pill acc" : "pill pass";
-    $("#ask-controls").innerHTML = S.catalog.map(function(k){
-      return '<label class="chk"><input type="checkbox" value="' + h(k.id) + '"> ' + h(k.id) + '</label>';
-    }).join("");
-    $("#queue").innerHTML = S.queue.length ? S.queue.map(function(q){
-      var stale = q.citations.some(function(x){ return x.stale; });
-      var badge, tag, body, acts;
-      if(q.decision){
-        badge = {approve:'<span class="pill pass">approved</span>', reject:'<span class="pill warn">sent back</span>', assign:'<span class="pill mute">assigned</span>'}[q.decision];
-        tag = 'decided by ' + h(q.approver) + (q.signature ? ' · <span class="sig">sig <b>' + h(q.signature.slice(0,16)) + '…</b></span>' : '');
-      } else if(q.status === "READY"){
-        badge = stale ? '<span class="pill warn">stale citation</span>' : '<span class="pill pass">ready</span>';
-        tag = q.citations.length + ' citation' + (q.citations.length === 1 ? '' : 's') + (stale ? ' · 1+ outside SLA' : ' · all fresh');
-      } else if(q.status === "DECLINED"){
-        badge = '<span class="pill fail">no draft</span>'; tag = 'agent declined';
-      } else {
-        badge = '<span class="pill fail">blocked</span>'; tag = 'rejected by ' + h(q.reason.split(":")[0]);
-      }
-      if(q.status === "READY") body = '<p class="q-a">' + h(q.answer) + '</p>';
-      else if(q.status === "DECLINED") body = '<p class="q-a"><strong>The agent did not answer.</strong> ' + h(q.reason) + '. Rather than infer an answer from the absence of records, the task is routed to a human. Under the Breach Notification Rule that determination is a judgement, not a query result.</p>';
-      else body = '<p class="q-a blocked"><strong>Draft rejected before review.</strong> ' + h(q.reason) + '</p>';
-      var cites = q.citations.map(function(x){ return '<span class="cite' + (x.stale ? ' stale' : '') + '">' + h(x.id) + ' &middot; ' + h(x.source) + ' &middot; ' + h(x.age) + (x.stale ? ' (SLA ' + h(x.sla) + ')' : '') + '</span>'; }).join("");
-      var dis = q.decision ? ' disabled' : '';
-      if(q.status === "DECLINED") acts = '<button class="btn" data-decide="assign"' + dis + '>Assign to IR owner</button><span class="hint">Silence in the evidence store is not evidence of absence.</span>';
-      else if(q.status === "READY") acts = '<button class="btn primary" data-decide="approve"' + dis + '>Approve &amp; send</button><button class="btn ghost" data-decide="reject"' + dis + '>Send back</button>' + (stale ? '<span class="hint">Approving with a stale citation is recorded as an exception on the audit trail.</span>' : '');
-      else acts = '<button class="btn ghost" data-decide="reject"' + dis + '>Send back</button>';
-      return '<div class="q' + (q.decision ? ' resolved' : '') + '" data-q="' + h(q.question_id) + '"><div class="q-top"><span class="id">' + h(q.question_id) + '</span>' + badge + '<span class="tag">' + tag + (q.mode && q.mode.indexOf("claude") === 0 ? ' · <span class="pill acc">claude draft</span>' : '') + '</span></div>' +
-        '<p class="q-q">' + h(q.question) + '</p>' + body + (cites ? '<div class="cites">' + cites + '</div>' : '') + '<div class="q-acts">' + acts + '</div></div>';
-    }).join("") : '<p class="empty">No drafts yet — ask a question above.</p>';
+    var blocked = S.events.filter(function(e){ return e.verdict === "blocked"; }).length;
+    var g = gap();
+    var meta = { posture: S.summary.pass + "/" + S.summary.total + " passing", agent: blocked + " blocked", approvals: pending ? pending + " pending" : "queue clear", frameworks: g ? "1 gap, " + g.hits.length + " hits" : "no gaps", ledger: S.chain_intact ? "chain intact" : "chain broken" };
+    var red = { posture: S.summary.fail > 0, agent: blocked > 0, approvals: pending > 0, frameworks: !!g, ledger: !S.chain_intact };
+    $("#rail").innerHTML = VIEWS.map(function(v){
+      return '<button type="button" class="navbtn" data-view="' + v.id + '"' + (v.id === view ? ' aria-current="page"' : '') + '>' +
+        '<span class="top"><span class="num">' + v.num + '</span><span class="lbl">' + h(v.label) + '</span></span>' +
+        '<span class="meta' + (red[v.id] ? ' red' : '') + '">' + h(meta[v.id]) + '</span></button>';
+    }).join("") + '<div class="cat"><div class="k" style="margin-bottom:6px">Catalog</div><div>v2026.09 · ' + S.controls.length + ' controls<br>SOC 2 TSC<br>ISO/IEC 27001:2022<br>45 CFR 164 Subpart C</div></div>';
+    var cur = VIEWS.filter(function(v){ return v.id === view; })[0];
+    $("#view-eyebrow").textContent = cur.eyebrow; $("#view-title").textContent = cur.title; $("#view-note").textContent = cur.note;
+    VIEWS.forEach(function(v){ $("#v-" + v.id).hidden = v.id !== view; });
   }
 
+  /* ---------- 01 posture ---------- */
+  function posture(){
+    var g = gap(), blocked = S.events.filter(function(e){ return e.verdict === "blocked"; }).length;
+    var pct = S.summary.total ? Math.round(100 * S.summary.pass / S.summary.total) : 0;
+    var fpct = S.evidence_total ? 100 * S.evidence_fresh / S.evidence_total : 0;
+    var poster = "";
+    if(g && g.hits.length > 1){
+      var names = g.hits.map(function(x){ return FW_SHORT[x.fw] + " " + fwName(x.fw, x.id); });
+      poster = '<div class="poster"><div class="k">Open gap · ' + h(g.control.id) + ' · blocks contract, not audit</div>' +
+        '<div class="big">One gap fails ' + (g.hits.length === 3 ? "three" : g.hits.length) + ' frameworks.</div>' +
+        '<p>' + h(g.control.reason || g.control.name) + ' That single record fails ' + h(names.slice(0,-1).join(", ")) + ' and ' + h(names[names.length-1]) + ' at once — one remediation closes all of them.</p>' +
+        '<button type="button" class="cta" data-view="frameworks">See the mapping →</button></div>';
+    }
+    var metrics = [
+      { k:"Controls passing", v: S.summary.pass + '<span style="font-size:22px;color:var(--color-neutral-700)">/' + S.summary.total + '</span>', sub: S.summary.degraded + " degraded · " + S.summary.fail + " failing", bar: pct },
+      { k:"Evidence within SLA", v: fpct.toFixed(1) + "%", sub: (S.evidence_total - S.evidence_fresh) + " of " + S.evidence_total + " records stale", bar: fpct },
+      { k:"Agent actions this session", v: String(S.events.length), sub:"reader + answer agents, real calls", bar:null },
+      { k:"Blocked by guardrails", v: String(blocked), sub:"enforced in code, not in prompts", bar:null, red:true }
+    ];
+    var rows = S.controls.slice().sort(function(a,b){ return STATE_RANK[a.state] - STATE_RANK[b.state]; });
+    $("#v-posture").innerHTML = poster +
+      '<div class="cells' + (poster ? ' under' : '') + '">' + metrics.map(function(m){
+        return '<div class="cell"><div class="k">' + h(m.k) + '</div><div class="val' + (m.red ? ' red' : '') + '">' + m.v + '</div>' +
+          (m.bar !== null ? '<div class="bar"><i style="width:' + m.bar + '%"></i></div>' : '') + '<div class="sub">' + h(m.sub) + '</div></div>';
+      }).join("") + '</div>' +
+      '<div class="sec-h"><h4>Control catalog</h4><span class="k2">Tested once · mapped outward · worst first</span></div>' +
+      '<div class="tbl-wrap"><table class="grid"><thead><tr><th>Control</th><th>Name</th><th>SLA</th><th>Evidence</th><th>State</th></tr></thead><tbody>' +
+      rows.map(function(c){
+        return '<tr><td class="idc' + (c.state === "FAIL" ? ' fail' : '') + '">' + h(c.id) + '</td><td><div class="rowname">' + h(c.name) + '</div>' + (c.state !== "PASS" && c.reason ? '<div class="rownote">' + h(c.reason) + '</div>' : '') + '</td>' +
+          '<td class="num">' + sla(c.sla_hours) + '</td><td class="num">' + c.evidence + '</td><td><span class="t ' + STATE_TAG[c.state] + '">' + h(c.state.toLowerCase()) + '</span></td></tr>';
+      }).join("") + '</tbody></table></div>' +
+      '<div class="legend"><span>PASS — all required kinds present and inside the SLA</span><span>DEGRADED — present but stale</span><span>FAIL — missing, or a record reports result=fail</span></div>';
+  }
+
+  /* ---------- 02 agent ---------- */
+  function agent(){
+    var evs = S.events;
+    if(openKey === null && evs.length) openKey = evs[0].ts + evs[0].title;
+    $("#v-agent").innerHTML =
+      '<div class="sec-h"><h4>Enforcement feed</h4><span class="k2">This session · ' + evs.length + ' events</span><span class="k2 right">Click a row for the enforcement record</span></div>' +
+      '<div class="feed">' + (evs.length ? evs.map(function(e){
+        var key = e.ts + e.title, open = key === openKey;
+        var kv = "";
+        if(e.rule) kv += '<dt>Rule</dt><dd class="strong">' + h(e.rule) + '</dd>';
+        if(e.enforcement) kv += '<dt>Enforcement</dt><dd>' + h(e.enforcement) + '</dd>';
+        if(e.disposition) kv += '<dt>Disposition</dt><dd>' + h(e.disposition) + '</dd>';
+        if(e.identity) kv += '<dt>Identity</dt><dd class="strong">' + h(e.identity) + '</dd>';
+        return '<div class="ev" data-v="' + h(e.verdict) + '"><button type="button" class="evbtn" data-key="' + h(key) + '" aria-expanded="' + open + '">' +
+          '<span class="when">' + h(e.ts.slice(11)) + '</span><span class="what"><span class="ttl">' + h(e.title) + '</span><span class="sub">' + h(e.sub) + '</span></span>' +
+          '<span class="flags"><span class="t ' + VERDICT_TAG[e.verdict] + '">' + h(e.verdict) + '</span>' + e.tags.filter(Boolean).map(function(t){ return '<span class="t">' + h(t) + '</span>'; }).join("") + '<span class="chev">' + (open ? '–' : '+') + '</span></span></button>' +
+          (open ? '<div class="evbody">' + (e.payload ? '<div class="payload"><span class="lbl">Untrusted document content — quoted, never executed</span>' + h(e.payload) + '</div>' : '') + '<dl class="kv">' + kv + '</dl></div>' : '') + '</div>';
+      }).join("") : '<p class="empty">No agent activity yet.</p>') + '</div>' +
+      '<div class="sec-h"><h4>Guardrail policy</h4><span class="k2">6 rules · enforced in attest/guardrails.py</span></div>' +
+      '<div class="cells under rails">' + RULES.map(function(r){ var n = S.rules[r[0]] || 0;
+        return '<div class="cell"><div class="name">' + r[0] + '</div><p>' + r[2] + '</p><div class="foot"><span class="t">' + r[1] + '</span><span class="count' + (n ? ' red' : '') + '">' + n + ' enforced this session</span></div></div>'; }).join("") + '</div>';
+  }
+
+  /* ---------- 03 approvals ---------- */
+  function approvals(){
+    var pending = S.queue.filter(function(q){ return !q.decision; }).length;
+    $("#v-approvals").innerHTML =
+      '<form class="draft" id="draft"><div class="k">Draft an answer</div>' +
+      '<div class="row"><input class="input" type="text" id="ask-q" placeholder="Type a customer question, e.g. Do you log administrative actions?"><button type="submit" class="btn btn-primary">Draft answer</button></div>' +
+      '<div class="chips">' + S.catalog.map(function(c){ return '<button type="button" class="chip" data-chip="' + h(c.id) + '" aria-pressed="' + (picked.indexOf(c.id) !== -1) + '">' + h(c.id) + '</button>'; }).join("") +
+      '<label class="chip llm" aria-disabled="' + !S.llm_available + '" title="' + (S.llm_available ? '' : 'needs: pip install anthropic + API credentials') + '"><input type="checkbox" id="ask-llm"' + (S.llm_available ? '' : ' disabled') + '> draft with Claude, validate with the same guardrails</label></div>' +
+      '<p>The agent queries the publishable set only, one budgeted step per control. No publishable record for a control means a decline, not a guess.</p></form>' +
+      '<div class="sec-h"><h4>Northwind Data Systems</h4><span class="k2">Security review</span><span class="t ' + (pending ? 'red' : '') + '" style="margin-left:auto">' + (pending ? pending + ' pending' : 'Queue clear') + '</span>' + (S.approvals_verified ? '' : '<span class="t red">signature mismatch</span>') + '</div>' +
+      '<div class="queue">' + (S.queue.length ? S.queue.map(function(q){
+        var stale = q.citations.some(function(c){ return c.stale; }), ready = q.status === "READY", decided = !!q.decision, blocked = q.status === "BLOCKED";
+        var badge = decided ? {approve:"approved", reject:"sent back", assign:"assigned"}[q.decision] : ready ? (stale ? "stale citation" : "ready") : blocked ? "blocked" : "no draft";
+        var badgeCls = decided ? "quiet" : ready ? (stale ? "ink" : "") : "red";
+        var tag = decided ? 'decided by ' + h(q.approver) + (q.signature ? ' · <span class="sig">sig ' + h(q.signature.slice(0,16)) + '…</span>' : '')
+          : ready ? q.citations.length + (q.citations.length === 1 ? ' citation' : ' citations') + (stale ? ' · 1 outside SLA' : ' · all fresh')
+          : blocked ? 'rejected by ' + h(q.reason.split(":")[0]) : 'agent declined';
+        var body = ready ? h(q.answer) : blocked ? '<strong>Draft rejected before review.</strong> ' + h(q.reason)
+          : '<strong>The agent did not answer:</strong> ' + h(q.reason) + '. Rather than infer from the absence of records, the task is routed to a human.';
+        var hint = decided ? "" : ready ? (stale ? "Approving with a stale citation is recorded as an exception on the audit trail." : "")
+          : q.gated ? "Evidence for these controls exists but is classified internal — the egress gate keeps it out of a customer-facing answer."
+          : blocked ? "Blocked before reaching the approval queue, so a reviewer never has to catch it." : "Silence in the evidence store is not evidence of absence.";
+        var acts = decided ? "" : (ready ? '<button type="button" class="btn btn-primary" data-decide="approve">Approve &amp; send</button>' : '') +
+          '<button type="button" class="btn btn-secondary" data-decide="' + (ready || blocked ? 'reject' : 'assign') + '">' + (ready || blocked ? 'Send back' : 'Assign to IR owner') + '</button>';
+        return '<div class="q' + (decided ? ' resolved' : '') + '" data-q="' + h(q.question_id) + '"><div class="top"><span class="qid">' + h(q.question_id) + '</span><span class="t ' + badgeCls + '">' + badge + '</span><span class="k2">' + tag + '</span>' + (q.mode && q.mode.indexOf("claude") === 0 ? '<span class="t quiet">claude draft</span>' : '') + '</div>' +
+          '<h5>' + h(q.question) + '</h5><div class="qbody' + (ready ? '' : ' red') + '">' + body + '</div>' +
+          (q.citations.length ? '<div class="cites"><span class="k">Citations</span>' + q.citations.map(function(c){ return '<span class="cite' + (c.stale ? ' stale' : '') + '">' + h(c.id) + ' · ' + h(c.source) + ' · ' + h(c.age) + (c.stale ? ' (SLA ' + h(c.sla) + ')' : '') + '</span>'; }).join("") + '</div>' : '') +
+          '<div class="acts">' + acts + (hint ? '<span class="hint">' + h(hint) + '</span>' : '') + '</div></div>';
+      }).join("") : '<p class="empty">No drafts yet — ask a question above.</p>') + '</div>' +
+      '<p class="foot-note">Approval writes ' + h(S.identity.user) + ' to the audit log against the claim and signs it with the approval key. "An agent did it" is not an auditable answer.</p>';
+    var q = $("#ask-q"); if(q && window.__askDraft) q.value = window.__askDraft;
+  }
+
+  /* ---------- 04 frameworks ---------- */
   function frameworks(){
-    var ids = Object.keys(S.frameworks);
-    $("#tabs").innerHTML = ids.map(function(id){
-      var rows = S.posture[id], p = rows.filter(function(r){ return r.state === "PASS"; }).length;
-      return '<button class="tab" role="tab" data-fw="' + id + '" aria-selected="' + (id === fw) + '">' + h(S.frameworks[id]) + '<span class="c">' + p + '/' + rows.length + '</span></button>';
-    }).join("");
-    var hipaa = fw === "hipaa";
-    $("#fw-table").innerHTML = '<table><thead><tr><th>' + (hipaa ? 'Citation' : 'Control') + '</th><th>Name</th>' + (hipaa ? '<th>Spec</th>' : '') + '<th>State</th><th>Evidence</th></tr></thead><tbody>' +
-      S.posture[fw].map(function(r){
-        return '<tr><td class="id">' + (hipaa ? '&sect;' : '') + h(r.framework_id) + '</td><td><div class="rowname">' + h(r.name) + '</div>' + (r.reason && r.state !== "PASS" ? '<div class="rownote">' + h(r.reason) + '</div>' : '') + '</td>' +
-          (hipaa ? '<td>' + (r.spec ? '<span class="pill ' + (r.spec === 'addressable' ? 'acc' : 'mute') + '">' + h(r.spec) + '</span>' : '') + '</td>' : '') +
-          '<td><span class="pill ' + STATE[r.state] + '">' + STATE_LABEL[r.state] + '</span></td><td class="num">' + r.evidence_ids.length + '</td></tr>';
-      }).join("") + '</tbody></table>';
-    // callout: controls that FAIL in every framework they map to
-    var failing = {};
-    ids.forEach(function(id){ S.posture[id].forEach(function(r){ if(r.state === "FAIL"){ (failing[r.control_id] = failing[r.control_id] || []).push(S.frameworks[id].split(" ")[0] + " " + r.framework_id); } }); });
-    var keys = Object.keys(failing);
-    var co = $("#callout");
-    if(keys.length){
-      co.hidden = false;
-      co.innerHTML = keys.map(function(k){ return '<span class="pill fail">1 gap &rarr; ' + failing[k].length + ' failure' + (failing[k].length === 1 ? '' : 's') + '</span><p class="txt"><b>' + h(k) + '</b> fails ' + h(failing[k].join(", ")) + '. One remediation closes all of them — and until it does, the deals that depend on them are blocked at contract, not at audit.</p>'; }).join("");
-    } else { co.hidden = true; }
+    var ids = Object.keys(S.frameworks); if(!fw || ids.indexOf(fw) === -1) fw = ids[0];
+    var hipaa = fw === "hipaa", rows = S.posture[fw];
+    var fails = rows.filter(function(r){ return r.state === "FAIL"; });
+    var byId = {}; S.controls.forEach(function(c){ byId[c.id] = c; });
+    $("#v-frameworks").innerHTML =
+      '<div class="tabs" role="tablist">' + ids.map(function(id){ var rs = S.posture[id], p = rs.filter(function(r){ return r.state === "PASS"; }).length;
+        return '<button type="button" class="tab" role="tab" data-fw="' + id + '" aria-selected="' + (id === fw) + '"><span class="l">' + h(S.frameworks[id]) + '</span><span class="c">' + p + '/' + rs.length + ' passing</span></button>'; }).join("") + '</div>' +
+      (fails.length ? '<div class="gapline"><b>' + fails.map(function(r){ return fwName(fw, r.framework_id) + ' fails'; }).join(" · ") + '</b><span>' + h(fails.map(function(r){ return r.control_id; }).filter(function(v,i,a){ return a.indexOf(v) === i; }).join(", ")) + (fails.length === 1 ? ' is the only failing control in this view; it appears once in every framework it maps to.' : ' are failing in this view.') + '</span></div>'
+        : '<div class="gapline ok"><b>No failing criteria</b><span>Every mapped control passes or is degraded in this framework.</span></div>') +
+      '<div class="tbl-wrap"><table class="grid strong" style="min-width:740px"><thead><tr><th>' + (hipaa ? 'Citation' : 'Criterion') + '</th><th>Internal control</th>' + (hipaa ? '<th>Spec</th>' : '') + '<th>Evidence</th><th>State</th></tr></thead><tbody>' +
+      rows.map(function(r){ var c = byId[r.control_id] || {};
+        return '<tr><td class="idc' + (r.state === "FAIL" ? ' fail' : '') + '">' + h(fwName(fw, r.framework_id)) + '</td><td><div class="rowname">' + h(r.name) + '</div><div class="rowcid">' + h(r.control_id) + '</div>' + (r.state !== "PASS" && c.reason ? '<div class="rownote">' + h(c.reason) + '</div>' : '') + '</td>' +
+          (hipaa ? '<td>' + (r.spec ? '<span class="t ' + (r.spec === 'addressable' ? 'quiet' : '') + '">' + h(r.spec) + '</span>' : '') + '</td>' : '') +
+          '<td class="num">' + r.evidence_ids.length + '</td><td><span class="t ' + STATE_TAG[r.state] + '">' + h(r.state.toLowerCase()) + '</span></td></tr>'; }).join("") + '</tbody></table></div>';
   }
 
+  /* ---------- 05 ledger ---------- */
   function ledger(){
-    $("#ev-count").textContent = "most recent " + S.evidence.length + " of " + S.evidence_total;
-    $("#chain").innerHTML = S.chain_intact ? '<span class="pill pass">chain intact</span>' : '<span class="pill fail">chain broken</span>';
-    var cls = {publishable:"mute", internal:"acc", restricted:"fail"};
-    $("#ev-table").innerHTML = '<thead><tr><th>ID</th><th>Source</th><th>Kind</th><th>Class</th><th>Digest</th><th>Age</th></tr></thead><tbody>' +
-      S.evidence.map(function(r){ return '<tr><td class="id">' + h(r.id) + '</td><td class="num">' + h(r.source) + '</td><td class="num">' + h(r.kind) + '</td><td><span class="pill ' + (cls[r.classification] || 'mute') + '">' + h(r.classification) + '</span></td><td class="num">' + h(r.digest) + '&hellip;</td><td class="num">' + h(r.age) + '</td></tr>'; }).join("") + '</tbody>';
-    $("#audit").innerHTML = S.audit.length ? S.audit.map(function(e, i){
-      var who = e.approver ? 'approver: ' + h(e.approver) : h(e.actor) + (e.model_version && e.model_version !== e.actor ? ' · ' + h(e.model_version) : '');
-      return '<div class="au' + (i === 0 ? ' new' : '') + '"><span class="t">' + h(e.ts.slice(11)) + '</span><span class="d"><strong>' + h(e.action) + ' &middot; ' + h(e.subject) + '</strong><span class="who">' + who + (e.rule ? ' · rule: ' + h(e.rule) : '') + (e.detail ? ' · ' + h(e.detail) : '') + '</span></span></div>';
-    }).join("") : '<p class="empty">Nothing recorded yet.</p>';
+    $("#v-ledger").innerHTML = '<div class="ledger"><div>' +
+      '<div class="sec-h"><h4>Evidence store</h4><span class="k2">Most recent ' + S.evidence.length + ' of ' + S.evidence_total + '</span><span class="chainpill' + (S.chain_intact ? '' : ' broken') + '">' + (S.chain_intact ? 'Chain intact' : 'Chain broken') + '</span></div>' +
+      '<div class="tbl-wrap"><table class="grid"><thead><tr><th>ID</th><th>Kind · source</th><th>Class</th><th>Digest</th><th>Age</th></tr></thead><tbody>' +
+      S.evidence.map(function(r){ return '<tr><td class="idc">' + h(r.id) + '</td><td><div style="font-size:14px;font-weight:600">' + h(r.kind) + '</div><div style="font-size:12px;color:var(--color-neutral-700)">' + h(r.source) + '</div></td><td><span class="t ' + (CLASS_TAG[r.classification] || '') + '">' + h(r.classification) + '</span></td><td class="num" style="color:var(--color-neutral-700)">' + h(r.digest) + '…</td><td class="num">' + h(r.age) + '</td></tr>'; }).join("") +
+      '</tbody></table></div>' +
+      '<div class="legend col"><span>PUBLISHABLE — citable in a customer-facing answer</span><span>INTERNAL — readable inside the org, never egressed</span><span>RESTRICTED — open findings; blocked at retrieval, not filtered after</span></div></div>' +
+      '<div><div class="sec-h"><h4>Audit trail</h4><span class="k2">Actor · model version · approver</span>' + (S.approvals_verified ? '<span class="t" style="margin-left:auto">signatures verified</span>' : '<span class="t red" style="margin-left:auto">signature mismatch</span>') + '</div><div>' +
+      (S.audit.length ? S.audit.map(function(e, i){ var who = e.approver ? 'approver: ' + h(e.approver) : h(e.actor) + (e.model_version && e.model_version !== e.actor ? ' · ' + h(e.model_version) : '');
+        return '<div class="au' + (i === 0 && window.__auditNew ? ' new' : '') + '"><span class="when">' + h(e.ts.slice(11)) + '</span><span><span class="head">' + h(e.action) + ' · ' + h(e.subject) + '</span><span class="who">' + who + (e.rule ? ' · rule: ' + h(e.rule) : '') + (e.detail ? ' · ' + h(e.detail) : '') + '</span></span></div>'; }).join("") : '<p class="empty">Nothing recorded yet.</p>') +
+      '</div><p class="foot-note" style="max-width:60ch">Every record’s SHA-256 covers its content plus the previous digest. There is no update or delete method — by construction.</p></div></div>';
   }
 
-  function identity(){
-    var sel = $("#persona");
-    sel.innerHTML = S.personas.map(function(p){ return '<option value="' + h(p.id) + '"' + (p.id === S.identity.persona ? ' selected' : '') + '>' + h(p.label) + ' · ' + h(p.user) + '</option>'; }).join("");
-    $("#grants").innerHTML = S.identity.grants.map(function(g){ return '<span class="pill ' + (g.indexOf("approve") === 0 ? 'acc' : 'mute') + '">' + h(g) + '</span>'; }).join("");
-    var llm = $("#ask-llm"); llm.disabled = !S.llm_available;
-    $("#llm-hint").textContent = S.llm_available ? "" : "(needs: pip install anthropic + API credentials)";
-    $("#sig-status").innerHTML = S.approvals_verified ? '<span class="pill pass">signatures verified</span>' : '<span class="pill fail">signature mismatch</span>';
-  }
-  function render(){
-    $("#hdr-ts").textContent = S.generated_at.slice(11);
-    identity(); tiles(); feed(); rails(); queue(); frameworks(); ledger();
-  }
+  function render(){ header(); rail(); posture(); agent(); approvals(); frameworks(); ledger(); }
 
   /* ---------- wiring ---------- */
   document.addEventListener("click", function(ev){
+    var nav = ev.target.closest("[data-view]"); if(nav){ view = nav.dataset.view; rail(); window.scrollTo({top:0, behavior:"auto"}); return; }
     var tab = ev.target.closest(".tab"); if(tab){ fw = tab.dataset.fw; frameworks(); return; }
-    var dec = ev.target.closest("button[data-decide]");
-    if(dec){ api("/api/decide", {question_id: dec.closest(".q").dataset.q, decision: dec.dataset.decide}); return; }
+    var evb = ev.target.closest(".evbtn"); if(evb){ openKey = openKey === evb.dataset.key ? "" : evb.dataset.key; agent(); return; }
+    var chip = ev.target.closest("button.chip"); if(chip){ var id = chip.dataset.chip, i = picked.indexOf(id); if(i === -1) picked.push(id); else picked.splice(i, 1); chip.setAttribute("aria-pressed", String(i === -1)); return; }
+    var dec = ev.target.closest("button[data-decide]"); if(dec){ window.__auditNew = true; api("/api/decide", {question_id: dec.closest(".q").dataset.q, decision: dec.dataset.decide}); return; }
+    if(ev.target.closest("#drawer-btn")){ drawer = !drawer; header(); return; }
     var b = ev.target.closest("button[data-do]"); if(!b) return;
-    var act = b.dataset.do;
-    if(act === "read-injected") api("/api/read-doc", {example:"injected"});
-    else if(act === "read-clean") api("/api/read-doc", {example:"clean"});
-    else if(act === "read-misconfigured") api("/api/read-doc", {example:"injected", tools:["read:documents","write:evidence"]});
-    else if(act === "read-pasted") api("/api/read-doc", {text: $("#paste").value, doc_id: $("#paste-id").value || undefined});
-    else if(act === "ask-13") api("/api/answer", {question:"Summarise the state of every control in one answer.", control_ids: S.catalog.map(function(k){ return k.id; }).concat(["CTL-X-01","CTL-X-02","CTL-X-03"])});
-    else if(act === "tamper") api("/api/tamper");
-    else if(act === "reseed"){ openKeys.clear(); api("/api/reseed"); }
+    var act = b.dataset.do; window.__auditNew = true;
+    if(act === "read-injected") api("/api/read-doc", {example:"injected"}).then(function(){ view = "agent"; rail(); });
+    else if(act === "read-clean") api("/api/read-doc", {example:"clean"}).then(function(){ view = "agent"; rail(); });
+    else if(act === "read-misconfigured") api("/api/read-doc", {example:"injected", tools:["read:documents","write:evidence"]}).then(function(){ view = "agent"; rail(); });
+    else if(act === "read-pasted") api("/api/read-doc", {text: $("#paste").value, doc_id: $("#paste-id").value || undefined}).then(function(){ view = "agent"; rail(); });
+    else if(act === "ask-13") api("/api/answer", {question:"Summarise the state of every control in one answer.", control_ids: S.catalog.map(function(k){ return k.id; }).concat(["CTL-X-01","CTL-X-02","CTL-X-03"])}).then(function(){ view = "approvals"; rail(); });
+    else if(act === "tamper") api("/api/tamper").then(function(){ view = "ledger"; rail(); });
+    else if(act === "reseed"){ openKey = null; picked = []; window.__auditNew = false; api("/api/reseed"); }
   });
-  $("#ask").addEventListener("submit", function(ev){
-    ev.preventDefault();
-    var ids = Array.prototype.map.call(document.querySelectorAll("#ask-controls input:checked"), function(i){ return i.value; });
-    api("/api/answer", {question: $("#ask-q").value, control_ids: ids, llm: $("#ask-llm").checked}).then(function(){ $("#ask-q").value = ""; });
+  document.addEventListener("submit", function(ev){
+    if(ev.target.id !== "draft") return; ev.preventDefault();
+    var q = $("#ask-q").value.trim(); if(!q){ toast("enter a question first"); return; }
+    window.__askDraft = ""; window.__auditNew = true;
+    api("/api/answer", {question: q, control_ids: picked.slice(), llm: !!($("#ask-llm") && $("#ask-llm").checked)}).then(function(){ picked = []; approvals(); });
   });
-  $("#persona").addEventListener("change", function(ev){
-    persona = ev.target.value;
-    try { localStorage.setItem("attest.persona", persona); } catch(e){}
+  document.addEventListener("input", function(ev){ if(ev.target.id === "ask-q") window.__askDraft = ev.target.value; });
+  document.addEventListener("change", function(ev){
+    if(ev.target.id !== "persona") return;
+    persona = ev.target.value; try { localStorage.setItem("attest.persona", persona); } catch(e){}
     load().then(function(){ toast("Now acting as " + S.identity.user + " — grants: " + S.identity.grants.join(", ")); });
   });
   load();
