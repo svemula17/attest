@@ -1,0 +1,4 @@
+Contoso Cloud — SOC 2 Type II Report, Section IV, p.9
+
+Control activity CC6.7: Data in transit is encrypted using TLS 1.2 or higher.
+Control activity CC8.1: Changes to production require peer review and automated testing.

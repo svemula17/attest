@@ -1,0 +1,10 @@
+{
+  "accepted": [
+    {
+      "control": "CTL-VENDOR-01",
+      "owner": "s.vemula",
+      "reason": "BAA execution in progress with 2 subprocessors; tracked in VEND-118",
+      "expires": "2026-10-31"
+    }
+  ]
+}

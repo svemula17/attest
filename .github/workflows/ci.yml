@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install pytest
+      - run: python -m pytest -q
+
+  # This repo dogfoods its own control engine: an unaccepted FAIL (or an expired
+  # risk acceptance in gate.json) fails the build.
+  control-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m attest.cli seed
+      - run: python -m attest.cli gate
+
+  # Live evidence from the real GitHub API. Informational only: GITHUB_TOKEN
+  # usually cannot read branch protection, so this job never blocks the build.
+  live-evidence:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m attest.cli seed
+      - run: python -m attest.cli collect github --repo ${{ github.repository }}
+        continue-on-error: true
+      - run: python -m attest.cli evaluate --framework soc2

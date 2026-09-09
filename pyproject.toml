@@ -1,0 +1,25 @@
+[project]
+name = "attest"
+version = "0.1.0"
+description = "Continuous compliance control plane with a governed agent layer (PoC)"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+llm = ["anthropic>=1.0"]
+
+[project.scripts]
+attest = "attest.cli:main"
+attest-mcp = "attest.mcp_server:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["attest*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:langsmith_plugin"
