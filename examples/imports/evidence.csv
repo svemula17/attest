@@ -1,0 +1,10 @@
+# Generic evidence: one record per row. control_ids are ';'-separated; classification is publishable|internal|restricted; result is pass|fail.
+# collected_at is optional (blank = now) and must be UTC like 2026-09-10T08:00:00Z. payload_json is an optional JSON object merged into the payload.
+# Import with:  attest import examples/imports/evidence.csv
+source,kind,control_ids,classification,collected_at,summary,result,payload_json
+aws-config,kms.key.rotation,CTL-CRYPTO-01,publishable,2026-09-10T08:00:00Z,Annual rotation enabled on 12/12 customer-managed KMS keys,pass,"{""keys"": 12, ""rotating"": 12}"
+aws-config,storage.encrypted,CTL-CRYPTO-01,publishable,,"All S3, EBS and RDS resources report encryption enabled",pass,
+cloudtrail,cloudtrail.enabled,CTL-LOG-01,publishable,,"Org-wide CloudTrail on, multi-region, log-file validation enabled",pass,
+mdm,mdm.disk-encryption,CTL-ENDPOINT-01,publishable,,FileVault / BitLocker on 212/212 managed devices,pass,
+training,training.completion,CTL-PEOPLE-01,publishable,,Annual security awareness training: 214/214 complete,pass,
+vendor-registry,baa.executed,CTL-VENDOR-01,internal,,2 of 11 subprocessors processing ePHI lack an executed BAA,fail,"{""missing"": [""Acme Analytics"", ""Northwind Mail""]}"

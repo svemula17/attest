@@ -1,0 +1,9 @@
+# HRIS roster export: one row per employee. Dates are YYYY-MM-DD; leave `terminated` blank for current staff.
+# Import with:  attest import examples/imports/hris-roster.csv   (the header picks the hris.roster mapping)
+employee_id,name,email,hired,terminated
+E-1001,Priya Natarajan,priya.natarajan@example.com,2022-03-14,
+E-1002,Marcus Lindqvist,marcus.lindqvist@example.com,2021-08-02,
+E-1003,Aisha Bello,aisha.bello@example.com,2023-01-09,
+E-1004,Tomás Ferreira,tomas.ferreira@example.com,2020-11-16,2026-07-31
+E-1005,Hannah Weiss,hannah.weiss@example.com,2024-05-20,
+E-1006,Kenji Watanabe,kenji.watanabe@example.com,2019-02-25,2026-08-15

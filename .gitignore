@@ -11,3 +11,7 @@ dist/
 deck/node_modules/
 deck/package-lock.json
 deck/slide-*.jpg
+sandbox/
+*.db
+*.db-wal
+*.db-shm

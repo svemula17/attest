@@ -1,0 +1,32 @@
+# docker compose up  →  http://localhost:8765  (admin@example.com / change-me on first boot)
+services:
+  attest:
+    build: .
+    ports: ["8765:8765"]
+    environment:
+      ATTEST_MODE: production          # or "sandbox" for seeded data + demo endpoints
+      ATTEST_STORAGE_URL: postgresql+psycopg://attest:attest@db:5432/attest
+      ATTEST_ADMIN_EMAIL: admin@example.com
+      ATTEST_ADMIN_PASSWORD: change-me
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    volumes:
+      - attest-data:/data              # attest.toml + imports/ live here; edit them on the host via `docker compose cp`
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: attest
+      POSTGRES_PASSWORD: attest
+      POSTGRES_DB: attest
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U attest"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+volumes:
+  attest-data:
+  pg-data:

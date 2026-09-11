@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in · Attest</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#F4F6F9;--surface:#fff;--line:#E3E7EE;--line-2:#CFD6E0;--ink:#0B1220;--ink-2:#465166;--ink-3:#66718A;--accent:#2F55E0;--accent-ink:#2443BD;--accent-soft:#EBF0FF;--fail:#C0262B;--fail-soft:#FDEAEA}
+@media (prefers-color-scheme:dark){:root{--bg:#0B0F16;--surface:#121824;--line:#212A3A;--line-2:#33405A;--ink:#E7EBF3;--ink-2:#A8B2C6;--ink-3:#7E8AA1;--accent:#7F97FF;--accent-ink:#A9B8FF;--accent-soft:#1A2347;--fail:#FF7A7E;--fail-soft:#361517}}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font:14px/1.5 "Instrument Sans",system-ui,sans-serif}
+.card{width:min(400px,92vw);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px 28px 24px;box-shadow:0 1px 3px rgba(11,18,32,.06)}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}.mark{width:28px;height:28px;border-radius:7px;background:var(--ink);color:var(--surface);display:grid;place-items:center;font-weight:700}
+h1{font-size:18px;margin:0}.sub{font-size:12px;color:var(--ink-3)}
+label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin:12px 0 4px}
+input{width:100%;font:inherit;padding:9px 11px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface);color:var(--ink)}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+button{margin-top:18px;width:100%;font:inherit;font-weight:600;padding:10px;border:0;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer}button:hover{background:var(--accent-ink)}
+.err{margin-top:12px;padding:8px 10px;border-radius:6px;background:var(--fail-soft);color:var(--fail);font-size:12.5px;display:none}
+.hint{margin-top:16px;font-size:12px;color:var(--ink-3)}.hint code{font-family:"JetBrains Mono",monospace;font-size:11.5px}
+</style>
+</head>
+<body>
+<form class="card" id="f">
+  <div class="brand"><div class="mark">A</div><div><h1>Attest</h1><div class="sub">Sign in to the control plane</div></div></div>
+  <label for="email">Email</label><input id="email" type="email" autocomplete="username" required>
+  <label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required>
+  <button type="submit">Sign in</button>
+  <div class="err" id="err"></div>
+  <p class="hint">Services use an API key instead: <code>Authorization: Bearer atst_…</code>. Create one with <code>attest keys create</code>.</p>
+</form>
+<script>
+document.getElementById("f").addEventListener("submit", async function(ev){
+  ev.preventDefault();
+  var err = document.getElementById("err"); err.style.display = "none";
+  var r = await fetch("/api/auth/login", {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({email: document.getElementById("email").value, password: document.getElementById("pw").value})});
+  if(r.ok){ location.href = "/"; return; }
+  var j = await r.json().catch(function(){ return {}; });
+  err.textContent = j.error || "Sign-in failed"; err.style.display = "block";
+});
+</script>
+</body>
+</html>

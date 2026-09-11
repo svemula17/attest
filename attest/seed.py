@@ -79,10 +79,17 @@ IDP_USERS = [
 
 
 def seed(data_dir: Path, now: datetime | None = None) -> tuple[EvidenceStore, AuditLog]:
-    now = now or datetime.now(timezone.utc)
+    """Seed the JSONL stores under data_dir (the PoC layout)."""
     data_dir.mkdir(parents=True, exist_ok=True)
     store = EvidenceStore(data_dir / "evidence.jsonl")
     audit = AuditLog(data_dir / "audit.jsonl")
+    seed_into(store, audit, now)
+    return store, audit
+
+
+def seed_into(store, audit, now: datetime | None = None) -> None:
+    """Seed ANY store/audit pair exposing append()/record() — JSONL or SQL."""
+    now = now or datetime.now(timezone.utc)
     for control_id, kind, source, classification, age_h, summary, result in SEED:
         collected = (now - timedelta(hours=age_h)).strftime("%Y-%m-%dT%H:%M:%SZ")
         store.append(
@@ -106,4 +113,3 @@ def seed(data_dir: Path, now: datetime | None = None) -> tuple[EvidenceStore, Au
     run_join(store, now=now)
     audit.record(actor="collector-agent", action="evidence.seeded", subject="evidence-store",
                  detail=f"{len(store.all())} records from {len({r.source for r in store.all()})} sources")
-    return store, audit

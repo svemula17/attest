@@ -2,10 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "attest",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "attest.server", "--port", "8765"],
+      "name": "attest-serve",
+      "runtimeExecutable": ".venv/bin/attest",
+      "runtimeArgs": ["--config", "sandbox/attest.toml", "serve", "--port", "8765", "--verbose"],
       "port": 8765
+    },
+    {
+      "name": "attest-poc",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "attest.server", "--port", "8766"],
+      "port": 8766
     }
   ]
 }

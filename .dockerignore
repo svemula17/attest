@@ -1,0 +1,12 @@
+.git
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+deck
+design
+data
+*.db
+*.db-wal
+*.db-shm
+node_modules

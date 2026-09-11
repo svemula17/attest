@@ -1,0 +1,10 @@
+# Identity-provider user export: status is active|deprovisioned; deprovisioned_at is UTC (2026-07-31T17:12:00Z) or blank.
+# Kenji Watanabe left on 2026-08-15 (see hris-roster.csv) but is still active here, so the HRIS x IdP join reports a finding.
+# Import with:  attest import examples/imports/idp-users.csv   (the header picks the idp.users mapping)
+email,status,deprovisioned_at
+priya.natarajan@example.com,active,
+marcus.lindqvist@example.com,active,
+aisha.bello@example.com,active,
+tomas.ferreira@example.com,deprovisioned,2026-07-31T17:12:00Z
+hannah.weiss@example.com,active,
+kenji.watanabe@example.com,active,

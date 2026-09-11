@@ -249,7 +249,7 @@ shotSlide(11, "THE JOIN", "Terminate someone in HRIS. Leave their Okta account a
   const s = pptx.addSlide(); s.background = { color: C.ink };
   s.addText("Agents draft.\nHumans decide.\nGuardrails live in code.", { x: 0.8, y: 1.5, w: 11, h: 2.7, fontFace: F, fontSize: 40, bold: true, color: C.white, isTextBox: true, margin: 0, valign: "top", lineSpacingMultiple: 1.15 });
   s.addText("github.com/svemula17/attest", { x: 0.8, y: 4.5, w: 11, h: 0.5, fontFace: M, fontSize: 18, color: "CDD5E4", isTextBox: true, margin: 0 });
-  s.addText("python3 -m attest.server        # → http://127.0.0.1:8765\npython3 -m pytest -q             # 221 passed\npython3 -m attest.cli collect join", { x: 0.8, y: 5.1, w: 11, h: 1.2, fontFace: M, fontSize: 13, color: "8A93A6", isTextBox: true, margin: 0, valign: "top" });
+  s.addText("python3 -m attest.server        # → http://127.0.0.1:8765\npython3 -m pytest -q             # 221 passed\nattest collect leavers", { x: 0.8, y: 5.1, w: 11, h: 1.2, fontFace: M, fontSize: 13, color: "8A93A6", isTextBox: true, margin: 0, valign: "top" });
   s.addText("Sai Kumar Vemula", { x: 0.8, y: 6.55, w: 11, h: 0.4, fontFace: F, fontSize: 13, color: "8A93A6", isTextBox: true, margin: 0 });
   s.addNotes("Close on the thesis. Offer the repo link and the two-minute demo.");
 }

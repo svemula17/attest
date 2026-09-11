@@ -261,10 +261,6 @@ def cmd_gate(args: argparse.Namespace) -> int:
     return 1 if blocking else 0
 
 
-def cmd_serve(args: argparse.Namespace) -> int:
-    from attest.server import main as serve
-    return serve(["--port", str(args.port), "--data", str(args.data)] + (["--keep"] if args.keep else []))
-
 
 def cmd_collect_join(args: argparse.Namespace) -> int:
     from attest.collectors.joiner_leaver import run_join
@@ -305,8 +301,11 @@ def cmd_sources(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="attest", description=__doc__)
-    p.add_argument("--data", type=Path, default=Path("data"), help="data directory (default ./data)")
+    p.add_argument("--data", type=Path, default=Path("data"), help="data directory for the JSONL commands (default ./data)")
+    p.add_argument("--config", help="attest.toml for the server-side commands (default: ./attest.toml or $ATTEST_CONFIG)")
     sub = p.add_subparsers(dest="cmd", required=True)
+    from attest import cli_admin
+    cli_admin.register(sub)                       # init · serve · users · keys · upgrade · config
 
     sub.add_parser("seed", help="populate the evidence store with representative records").set_defaults(fn=cmd_seed)
 
@@ -340,7 +339,7 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--out")
     x.set_defaults(fn=cmd_export)
 
-    c = sub.add_parser("collect", help="collect live evidence from an external system")
+    c = sub.add_parser("pull", help="(data-dir) pull live evidence into the JSONL store without a config: github, join")
     csub = c.add_subparsers(dest="collector", required=True)
     gh = csub.add_parser("github", help="default-branch protection -> CTL-CHANGE-01 (pr.review-required, ci.policy-gate)")
     gh.add_argument("--repo", required=True, metavar="OWNER/NAME")
@@ -358,10 +357,8 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--strict", action="store_true", help="DEGRADED controls also fail the gate")
     g.set_defaults(fn=cmd_gate)
 
-    sv = sub.add_parser("serve", help="run the dashboard as a local web application")
-    sv.add_argument("--port", type=int, default=8765)
-    sv.add_argument("--keep", action="store_true", help="keep existing data instead of reseeding")
-    sv.set_defaults(fn=cmd_serve)
+    from attest import cli_collect                # import · collect <source-id|--all> · sources list (config-driven)
+    cli_collect.register(sub)
     return p
 
 

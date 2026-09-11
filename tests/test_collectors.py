@@ -166,7 +166,7 @@ def test_branch_name_is_url_encoded(store):
 
 def test_cli_collect_github_appends_and_prints(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(gh, "_default_fetch", make_fetch((200, PROTECTED)))
-    rc = main(["--data", str(tmp_path), "collect", "github", "--repo", "acme/widgets", "--token", "t"])
+    rc = main(["--data", str(tmp_path), "pull", "github", "--repo", "acme/widgets", "--token", "t"])
     out = capsys.readouterr().out
     assert rc == 0
     assert "hint:" not in out
@@ -179,7 +179,7 @@ def test_cli_collect_github_appends_and_prints(tmp_path, monkeypatch, capsys):
 def test_cli_collect_github_permission_error_exits_5_with_hint(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(gh, "gh_available", lambda: False)   # the hint only prints without the gh CLI
     monkeypatch.setattr(gh, "_default_fetch", make_fetch((403, {"message": "Must have admin rights to Repository."})))
-    rc = main(["--data", str(tmp_path), "collect", "github", "--repo", "acme/widgets"])
+    rc = main(["--data", str(tmp_path), "pull", "github", "--repo", "acme/widgets"])
     out = capsys.readouterr().out
     assert rc == 5
     assert "hint: no GitHub token found" in out
@@ -189,7 +189,7 @@ def test_cli_collect_github_permission_error_exits_5_with_hint(tmp_path, monkeyp
 
 def test_cli_collect_github_repo_not_found_exits_1(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(gh, "_default_fetch", make_fetch((200, PROTECTED), repo=(404, {"message": "Not Found"})))
-    rc = main(["--data", str(tmp_path), "collect", "github", "--repo", "acme/widgets", "--token", "t"])
+    rc = main(["--data", str(tmp_path), "pull", "github", "--repo", "acme/widgets", "--token", "t"])
     assert rc == 1
     assert "repo not found or not accessible" in capsys.readouterr().out
 

@@ -1,0 +1,34 @@
+{
+  "comment": "Generic evidence records. Import with: attest import examples/imports/evidence.json. Every record needs source, kind, control_ids, classification and payload{summary, result}; collected_at is optional (UTC, blank = now). Keys other than 'records' in this envelope are ignored; unknown keys inside a record are reported as warnings.",
+  "records": [
+    {
+      "source": "aws-iam",
+      "kind": "iam.least-privilege",
+      "control_ids": ["CTL-ACCESS-01"],
+      "classification": "publishable",
+      "collected_at": "2026-09-10T08:00:00Z",
+      "payload": {"summary": "0 IAM principals with wildcard actions; SCP denies root usage", "result": "pass", "principals_checked": 148}
+    },
+    {
+      "source": "okta",
+      "kind": "sso.enforced",
+      "control_ids": ["CTL-ACCESS-01"],
+      "classification": "publishable",
+      "payload": {"summary": "SSO + MFA enforced for 100% of workforce accounts", "result": "pass"}
+    },
+    {
+      "source": "snyk",
+      "kind": "vuln.findings-sla",
+      "control_ids": ["CTL-VULN-01"],
+      "classification": "publishable",
+      "payload": {"summary": "Open criticals: 0; highs: 3, oldest 6 days against a 14-day SLA", "result": "pass", "critical": 0, "high": 3}
+    },
+    {
+      "source": "backup",
+      "kind": "backup.restore-test",
+      "control_ids": ["CTL-BACKUP-01"],
+      "classification": "publishable",
+      "payload": {"summary": "Restore test 2026-09-02: full production restore in 41 min against a 60 min RTO", "result": "pass"}
+    }
+  ]
+}

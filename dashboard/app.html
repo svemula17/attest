@@ -261,7 +261,9 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
       <span class="status" id="status"><i></i> Collectors healthy <span class="ts" id="stamp">…</span></span>
       <div class="right">
         <span class="grants" id="grants"></span>
+        <span class="status" id="whoami" hidden></span>
         <select class="persona" id="persona" aria-label="Acting as"></select>
+        <button type="button" class="btn" id="signout" hidden>Sign out</button>
         <button type="button" class="btn" id="demo-btn" aria-expanded="false" aria-controls="panel">Demo actions</button>
       </div>
     </header>
@@ -338,8 +340,8 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
   ];
   var FW_SHORT = { soc2:"SOC 2", iso27001:"ISO/IEC", hipaa:"HIPAA" };
 
-  var persona = (function(){ try { return localStorage.getItem("attest.persona") || "security-engineer"; } catch(e){ return "security-engineer"; } })();
-  function hdrs(){ return {"Content-Type":"application/json", "X-Attest-User": persona}; }
+  var PERSONAS = null;
+  function hdrs(){ return {"Content-Type":"application/json"}; }
   function toast(msg){ var t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 2800); }
   function api(path, body){
     return fetch(path, {method:"POST", headers:hdrs(), body:JSON.stringify(body || {})})
@@ -349,7 +351,8 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
         S = j; render(); }); })
       .catch(function(e){ if(!(e instanceof Error)) toast("server unreachable"); });
   }
-  function load(){ return fetch("/api/state", {headers:hdrs()}).then(function(r){ return r.json(); }).then(function(j){ S = j; render(); }); }
+  function load(){ return fetch("/api/state", {headers:hdrs()}).then(function(r){ if(r.status === 401){ location.href = "/login"; throw new Error("unauthenticated"); } return r.json(); }).then(function(j){ S = j; render(); }); }
+  function loadPersonas(){ if(PERSONAS || !S || S.mode !== "sandbox") return Promise.resolve(); return fetch("/api/personas").then(function(r){ return r.ok ? r.json() : []; }).then(function(j){ PERSONAS = j; chrome(); }); }
 
   function tidy(reason){ return String(reason || "").replace(/\s+for CTL-[A-Z0-9-]+(?=[.;,]|$)/g, "").replace(/(\d+)\.\d+h/g, "$1h"); }
   function sla(hours){ return hours >= 48 ? (hours/24) + "d" : hours + "h"; }
@@ -366,8 +369,16 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
 
   function chrome(){
     var st = $("#status"); st.className = "status" + (S.chain_intact ? "" : " off"); st.innerHTML = "<i></i> " + (S.chain_intact ? "Collectors healthy" : "Ledger integrity failure") + ' <span class="ts">' + h(S.generated_at.slice(11)) + '</span>';
-    $("#persona").innerHTML = S.personas.map(function(p){ return '<option value="' + h(p.id) + '"' + (p.id === S.identity.persona ? ' selected' : '') + ' title="' + h(p.user) + '">' + h(p.label) + '</option>'; }).join("");
-    $("#grants").innerHTML = '<span class="tag" title="' + h(S.identity.grants.join("  ·  ")) + '">' + S.identity.grants.length + ' grant' + (S.identity.grants.length === 1 ? '' : 's') + '</span>';
+    var sel = $("#persona"), who = $("#whoami"), out = $("#signout");
+    if(S.mode === "sandbox"){
+      sel.hidden = false; out.hidden = true; who.hidden = true;
+      sel.innerHTML = (PERSONAS || [{id:S.identity.user, label:S.identity.name || S.identity.user, role:S.identity.role}]).map(function(p){ return '<option value="' + h(p.id) + '"' + (p.id === S.identity.user ? ' selected' : '') + '>' + h(p.label) + ' · ' + h(p.role) + '</option>'; }).join("");
+    } else {
+      sel.hidden = true; out.hidden = false; who.hidden = false;
+      who.textContent = (S.identity.name || S.identity.user) + " · " + S.identity.role;
+    }
+    $("#grants").innerHTML = '<span class="tag" title="' + h(S.identity.grants.join(", ")) + '">' + S.identity.grants.length + ' grants</span>';
+    $("#demo-btn").hidden = S.mode !== "sandbox";
     $("#panel").hidden = !panel; $("#scrim").hidden = !panel; $("#demo-btn").setAttribute("aria-expanded", String(panel));
     $("#ctl-count").textContent = S.controls.length;
     var pending = S.queue.filter(function(q){ return !q.decision; }).length, blocked = S.events.filter(function(e){ return e.verdict === "blocked"; }).length, g = gap();
@@ -474,7 +485,11 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
         (L ? '<div class="join-res' + (L.result === "fail" ? ' red' : '') + '"><div class="mono">' + h(L.summary) + '</div>' + (L.orphans && L.orphans.length ? '<ul>' + L.orphans.map(function(o){ return '<li><b>' + h(o.name) + '</b> <span class="mono">' + h(o.email) + '</span> · terminated ' + h(o.terminated) + ' · IdP ' + h(o.idp_status) + ' · open ' + h(o.days_open) + ' days</li>'; }).join("") + '</ul>' : '') + '<div class="hint">checked ' + h(L.checked) + ' leavers against a ' + h(L.sla_hours) + 'h SLA · ' + h(L.age) + ' ago</div></div>' : '') +
         '<div class="acts"><button type="button" class="btn sm" data-do="join">Run the join</button><button type="button" class="btn sm danger" data-do="terminate">Terminate an employee in HRIS, leave their IdP account active</button><span class="hint">Each run appends a new evidence record; the finding stays on the ledger.</span></div></div></div>';
     }
-    $("#v-sources").innerHTML = joinCard + (fam.length ? fam.map(function(f){
+    var cs = S.configured_sources || [];
+    var runCard = '<div class="card" style="margin-bottom:16px"><div class="card-h"><h3>Configured sources</h3><span class="sub">' + (cs.length ? cs.length + ' in attest.toml · run by schedule or by hand' : 'none configured — add [sources.*] to attest.toml') + '</span></div>' +
+      (cs.length ? '<div class="tbl-wrap"><table><thead><tr><th>Source</th><th>Type</th><th>Schedule</th><th>Last run</th><th></th></tr></thead><tbody>' + cs.map(function(s){ var lr = s.last_run; return '<tr><td class="id">' + h(s.id) + '</td><td>' + h(s.type) + '</td><td class="num">' + h(s.schedule || "manual") + '</td><td>' + (lr ? pill(lr.status === "ok" ? "pass" : lr.status === "error" ? "fail" : "warn", lr.status) + ' <span class="hint">' + h((lr.finished_at || lr.started_at || "").slice(0,16).replace("T"," ")) + (lr.records ? ' · ' + lr.records + ' rec' : '') + (lr.error ? ' · ' + h(lr.error).slice(0,60) : '') + '</span>' : '<span class="hint">never</span>') + '</td><td style="text-align:right"><button type="button" class="btn sm" data-run="' + h(s.id) + '"' + (s.enabled ? '' : ' disabled') + '>Run now</button></td></tr>'; }).join("") + '</tbody></table></div>' : '') +
+      '<form id="import-form" class="draft" style="margin:0;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none"><div class="row" style="align-items:center"><label class="btn sm" style="cursor:pointer">Choose CSV / JSON<input type="file" id="import-file" accept=".csv,.json" hidden></label><span class="hint" id="import-name"></span><select class="persona" id="import-mapping" aria-label="Mapping"><option value="">infer mapping</option><option value="evidence">evidence (CSV)</option><option value="hris.roster">hris.roster (CSV)</option><option value="idp.users">idp.users (CSV)</option><option value="evidence.json">evidence (JSON)</option></select><button type="submit" class="btn primary sm">Import</button><span class="hint">Validated whole-file before anything is written; records are hash-chained on ingest.</span></div><ul id="import-problems" class="hint" style="margin:0;padding-left:18px;color:var(--fail)"></ul></form></div>';
+    $("#v-sources").innerHTML = runCard + joinCard + (fam.length ? fam.map(function(f){
       var n = f.sources.reduce(function(a, s){ return a + s.records; }, 0);
       return '<div class="card fam"><div class="card-h"><h3>' + h(f.name) + '</h3><span class="sub">' + f.sources.length + ' system' + (f.sources.length === 1 ? '' : 's') + ' · ' + n + ' record' + (n === 1 ? '' : 's') + '</span></div><div class="tbl-wrap"><table><thead><tr><th>System</th><th>Proves</th><th>Evidence kinds</th><th>Records</th><th>Newest</th><th>State</th></tr></thead><tbody>' +
         f.sources.map(function(s){ return '<tr><td><div class="rowname">' + h(s.system) + '</div><div class="rowcid">' + h(s.id) + '</div></td><td class="proves">' + h(s.proves) + '</td><td class="kinds">' + s.kinds.map(function(k){ return '<span class="tag">' + h(k) + '</span>'; }).join(" ") + '</td><td class="num">' + s.records + '</td><td class="num">' + h(s.newest_age || "—") + '</td><td>' + (s.state ? pill(STATE[s.state], s.state.toLowerCase()) : pill("mute nodot", "no control")) + '</td></tr>'; }).join("") + '</tbody></table></div></div>';
@@ -511,12 +526,26 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
   });
   document.addEventListener("input", function(ev){ if(ev.target.id === "ask-q") window.__askDraft = ev.target.value; });
   document.addEventListener("change", function(ev){
-    if(ev.target.id !== "persona") return;
-    persona = ev.target.value; try { localStorage.setItem("attest.persona", persona); } catch(e){}
-    load().then(function(){ toast("Now acting as " + S.identity.user + " — grants: " + S.identity.grants.join(", ")); });
+    if(ev.target.id === "persona"){
+      fetch("/api/auth/impersonate", {method:"POST", headers:hdrs(), body: JSON.stringify({email: ev.target.value})})
+        .then(function(){ return load(); }).then(function(){ toast("Now acting as " + S.identity.user + " (" + S.identity.role + ") — grants: " + S.identity.grants.join(", ")); });
+    }
+    if(ev.target.id === "import-file" && ev.target.files.length){ $("#import-name").textContent = ev.target.files[0].name; }
+  });
+  document.addEventListener("click", function(ev){
+    if(ev.target.closest("#signout")){ fetch("/api/auth/logout", {method:"POST"}).then(function(){ location.href = "/login"; }); return; }
+    var run = ev.target.closest("button[data-run]"); if(run){ run.disabled = true; fetch("/api/sources/" + encodeURIComponent(run.dataset.run) + "/collect", {method:"POST", headers:hdrs()}).then(function(r){ return r.json().then(function(j){ if(!r.ok){ toast(j.error || "run failed"); } else { toast(run.dataset.run + ": " + j.status + " · " + (j.summary || (j.records + " records"))); } return load(); }); }); return; }
+  });
+  document.addEventListener("submit", function(ev){
+    if(ev.target.id !== "import-form") return; ev.preventDefault();
+    var f = $("#import-file"); if(!f.files.length){ toast("Choose a CSV or JSON file"); return; }
+    var fd = new FormData(); fd.append("file", f.files[0]); var m = $("#import-mapping").value; if(m) fd.append("mapping", m);
+    fetch("/api/import", {method:"POST", body: fd}).then(function(r){ return r.json().then(function(j){
+      if(!r.ok){ toast(j.error || "import failed"); if(j.problems){ $("#import-problems").innerHTML = j.problems.map(function(p){ return '<li>' + h(p) + '</li>'; }).join(""); } return; }
+      $("#import-problems").innerHTML = ""; toast("Imported " + j.records + " record" + (j.records === 1 ? "" : "s") + " · " + j.kinds.join(", ")); f.value = ""; $("#import-name").textContent = ""; return load(); }); });
   });
   document.addEventListener("keydown", function(ev){ if(ev.key === "Escape" && panel){ panel = false; chrome(); } });
-  load();
+  load().then(loadPersonas);
 })();
 </script>
 
