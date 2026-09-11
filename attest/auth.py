@@ -190,6 +190,16 @@ class SessionCodec:
     def issue(self, identity: Identity) -> str:
         return self._s.dumps({"uid": identity.user_id})
 
+    def sign(self, payload: dict) -> str:
+        """A short-lived signed blob (OIDC state/nonce/verifier travel in a cookie)."""
+        return self._s.dumps(payload)
+
+    def unsign(self, token: str, max_age: int = 600) -> dict:
+        try:
+            return self._s.loads(token, max_age=max_age)
+        except (SignatureExpired, BadSignature) as e:
+            raise AuthError("invalid or expired token") from e
+
     def resolve(self, engine: Engine, token: str) -> Identity:
         try:
             data = self._s.loads(token, max_age=self.max_age)
@@ -202,3 +212,11 @@ class SessionCodec:
             if u is None or u.disabled:
                 raise AuthError("session user is disabled")
             return _identity(u, "session")
+
+
+def identity_for_email(engine: Engine, email: str, via: str = "oidc") -> Identity:
+    with session_scope(engine) as s:
+        u = s.scalar(select(User).where(User.email == email.strip().lower()))
+        if u is None or u.disabled:
+            raise AuthError("user is unknown or disabled")
+        return _identity(u, via)

@@ -21,6 +21,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
       - run: python -m pytest -q
+      - run: pip-audit --strict --desc
+        if: matrix.python-version == '3.13'
 
   # This repo dogfoods its own control engine: an unaccepted FAIL (or an expired
   # risk acceptance in gate.json) fails the build.

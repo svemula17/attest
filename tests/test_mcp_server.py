@@ -318,3 +318,31 @@ def test_stdio_subprocess_round_trip(tmp_path):
     entries = AuditLog(data / "audit.jsonl").all()
     assert len(entries) == audited_before + 1
     assert entries[-1].actor == "mcp-client" and entries[-1].action == "mcp.tools/call" and entries[-1].subject == "evidence_query"
+
+
+def test_mcp_from_config_requires_a_key_with_read_evidence(tmp_path, monkeypatch):
+    """The real-tool path: SQL store from attest.toml, identity from an API key."""
+    from attest.auth import AuthError, create_api_key, create_user
+    from attest.config import default_config_toml
+    from attest.db import get_engine, upgrade
+    from attest.mcp_server import Context, handle
+    from attest.seed import seed_into
+    from attest.store_sql import SqlAuditLog, SqlEvidenceStore
+
+    cfg_path = tmp_path / "attest.toml"
+    cfg_path.write_text(default_config_toml(mode="production", storage_url=f"sqlite:///{tmp_path/'m.db'}"))
+    url = f"sqlite:///{tmp_path/'m.db'}"
+    upgrade(url); engine = get_engine(url)
+    seed_into(SqlEvidenceStore(engine), SqlAuditLog(engine))
+    create_user(engine, "ci@example.com", "service")
+    secret, _ = create_api_key(engine, "ci@example.com", "mcp")
+    with pytest.raises(AuthError):
+        Context.from_config(str(cfg_path), None)
+    with pytest.raises(AuthError):
+        Context.from_config(str(cfg_path), "atst_nope")
+    ctx = Context.from_config(str(cfg_path), secret)
+    assert ctx.actor == "mcp:ci@example.com"
+    res = handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                  "params": {"name": "evidence_query", "arguments": {"limit": 5}}}, ctx)
+    assert res["result"]["isError"] is False
+    assert ctx.audit.query(action_prefix="mcp.")[0].actor == "mcp:ci@example.com"

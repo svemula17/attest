@@ -22,6 +22,7 @@ JSON-RPC responses only; all logging goes to stderr.  Stdlib only.
 from __future__ import annotations
 
 import argparse
+import os
 import copy
 import json
 import sys
@@ -160,13 +161,40 @@ TOOLS: tuple[dict, ...] = (
 class Context:
     """Open handles for one server process (store, audit log, control engine)."""
 
-    def __init__(self, data_dir: Path):
-        self.data_dir = Path(data_dir)
-        self.store = EvidenceStore(self.data_dir / "evidence.jsonl")
-        self.audit = AuditLog(self.data_dir / "audit.jsonl")
+    def __init__(self, data_dir: Path | None = None, store=None, audit=None, actor: str | None = None):
+        if store is None:  # the PoC layout: JSONL files in a data directory
+            self.data_dir = Path(data_dir or "data")
+            store = EvidenceStore(self.data_dir / "evidence.jsonl")
+            audit = AuditLog(self.data_dir / "audit.jsonl")
+        else:
+            self.data_dir = None
+        self.store = store
+        self.audit = audit
+        self.actor = actor or AUDIT_ACTOR
         self.engine = ControlEngine(default_catalog(), self.store)
         self.protocol_version = DEFAULT_PROTOCOL_VERSION
         self.initialized = False
+
+    @classmethod
+    def from_config(cls, config_path: str | None, api_key: str | None) -> "Context":
+        """The real tool: SQL store from attest.toml, identity from an API key with read:evidence."""
+        from attest.auth import AuthError, authenticate_api_key
+        from attest.config import load_config
+        from attest.db import get_engine, upgrade
+        from attest.store_sql import SqlAuditLog, SqlEvidenceStore
+        cfg = load_config(config_path)
+        url = cfg.storage.url
+        if url.startswith("sqlite:///") and not url.startswith("sqlite:////"):
+            url = "sqlite:///" + str(cfg.resolve(url[len("sqlite:///"):]))
+        if not api_key:
+            raise AuthError("ATTEST_API_KEY is required to serve MCP from attest.toml (create one with `attest keys create`)")
+        upgrade(url)
+        engine = get_engine(url)
+        identity = authenticate_api_key(engine, api_key)
+        identity.require("read:evidence")
+        ctx = cls(store=SqlEvidenceStore(engine), audit=SqlAuditLog(engine), actor=f"mcp:{identity.email}")
+        ctx.identity = identity
+        return ctx
 
 
 class ToolError(Exception):
@@ -344,7 +372,7 @@ def _tools_call(params: dict, ctx: Context) -> dict:
     finally:
         status = "ok" if not is_error else f"error: {text}"
         ctx.audit.record(
-            actor=AUDIT_ACTOR,
+            actor=ctx.actor,
             action=AUDIT_ACTION,
             subject=name[:200],
             rule=None,
@@ -438,12 +466,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--data",
         type=Path,
-        default=Path("data"),
-        help="directory holding evidence.jsonl and audit.jsonl (default: ./data)",
+        default=None,
+        help="PoC layout: directory holding evidence.jsonl and audit.jsonl",
     )
+    parser.add_argument("--config", help="attest.toml of a real installation; requires $ATTEST_API_KEY (a key with read:evidence)")
     args = parser.parse_args(argv)
-    ctx = Context(args.data)
-    _log(f"v{SERVER_VERSION} serving {len(TOOLS)} read-only tools from {ctx.data_dir} over stdio")
+    if args.config or (args.data is None and os.environ.get("ATTEST_CONFIG")):
+        try:
+            ctx = Context.from_config(args.config, os.environ.get("ATTEST_API_KEY"))
+        except Exception as e:  # never start with a half-configured identity
+            _log(f"refusing to start: {e}")
+            return 2
+        _log(f"v{SERVER_VERSION} serving {len(TOOLS)} read-only tools as {ctx.actor} over stdio")
+    else:
+        ctx = Context(args.data or Path("data"))
+        _log(f"v{SERVER_VERSION} serving {len(TOOLS)} read-only tools from {ctx.data_dir} over stdio")
     try:
         return serve(sys.stdin, sys.stdout, ctx)
     except (KeyboardInterrupt, BrokenPipeError):

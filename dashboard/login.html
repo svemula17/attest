@@ -25,10 +25,12 @@ button{margin-top:18px;width:100%;font:inherit;font-weight:600;padding:10px;bord
   <label for="email">Email</label><input id="email" type="email" autocomplete="username" required>
   <label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required>
   <button type="submit">Sign in</button>
+  <a id="sso" href="/api/auth/oidc/start" style="display:none;margin-top:10px;text-align:center;padding:9px;border:1px solid var(--line-2);border-radius:6px;color:var(--ink);text-decoration:none;font-weight:600">Sign in with SSO</a>
   <div class="err" id="err"></div>
   <p class="hint">Services use an API key instead: <code>Authorization: Bearer atst_…</code>. Create one with <code>attest keys create</code>.</p>
 </form>
 <script>
+fetch("/api/auth/methods").then(function(r){ return r.json(); }).then(function(m){ if(m.oidc){ var a = document.getElementById("sso"); a.style.display = "block"; a.textContent = "Sign in with SSO (" + (m.oidc_issuer || "").replace(/^https?:\/\//, "") + ")"; } }).catch(function(){});
 document.getElementById("f").addEventListener("submit", async function(ev){
   ev.preventDefault();
   var err = document.getElementById("err"); err.style.display = "none";

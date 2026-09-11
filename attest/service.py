@@ -83,6 +83,10 @@ class Service:
                 set_setting(s, "approval_key", current)
             return bytes.fromhex(current["hex"])
 
+    def sign_bytes(self, data: bytes) -> str:
+        """HMAC-SHA256 with this installation's approval key (packages, manifests, decisions)."""
+        return hmac.new(self.key, data, hashlib.sha256).hexdigest()
+
     # ---- feed: persisted as guardrail entries in the audit log -----------
     def _event(self, verdict: str, title: str, sub: str, tags=(), rule=None, enforcement="", disposition="",
                identity="", payload=None, actor: str = "attest") -> dict:
@@ -161,7 +165,8 @@ class Service:
             self._drafter = ClaudeDrafter(model=self.cfg.llm.model)
         return self._drafter
 
-    def answer(self, identity: Identity, question: str, control_ids: list[str], qid: str | None = None, llm: bool = False) -> dict:
+    def answer(self, identity: Identity, question: str, control_ids: list[str], qid: str | None = None, llm: bool = False,
+               questionnaire_id: str | None = None, ref: str | None = None) -> dict:
         scope = identity.scope()
         with self.lock:
             qid = qid or self.drafts.next_question_id()
@@ -169,9 +174,14 @@ class Service:
         agent = AnswerAgent(self.store, self.audit, scope, allowlist=frozenset({"read:evidence"}), **kwargs)
         draft = agent.draft(qid, question, list(control_ids))
         mode = f"{self.cfg.llm.model} draft · guardrails validated" if llm else "deterministic draft"
-        row = self.drafts.create(dict(question_id=qid, question=question, control_ids=list(control_ids), status=draft.status,
-                                      answer=draft.answer, reason=draft.reason, citations=self._citations(draft.evidence_ids),
-                                      mode=mode, model_version=agent.model_version, created_at=now_iso(), created_by=identity.email))
+        fields = dict(question_id=qid, question=question, control_ids=list(control_ids), status=draft.status,
+                      answer=draft.answer, reason=draft.reason, citations=self._citations(draft.evidence_ids),
+                      mode=mode, model_version=agent.model_version, created_at=now_iso(), created_by=identity.email)
+        if questionnaire_id:
+            fields["questionnaire_id"] = questionnaire_id
+        if ref:
+            fields["ref"] = ref
+        row = self.drafts.create(fields)
         who = f"answer-agent · requester: {identity.email} · {mode}"
         if draft.status == "READY":
             self._event("allowed", f"Questionnaire {qid} drafted with {len(draft.evidence_ids)} citation(s)", f"answer-agent · {question}",
@@ -209,7 +219,7 @@ class Service:
         """What the console renders for one draft."""
         gated = row["status"] == "DECLINED" and any(
             r.classification != "publishable" for cid in row.get("control_ids", []) for r in self.store.query(control_id=cid))
-        return dict(question_id=row["question_id"], question=row["question"], answer=row.get("answer", ""),
+        return dict(question_id=row["question_id"], question=row["question"], answer=row.get("answer", ""), ref=row.get("ref"),
                     evidence_ids=[c["id"] for c in row.get("citations", [])], gated=gated, status=row["status"],
                     reason=row.get("reason", ""), citations=row.get("citations", []), control_ids=row.get("control_ids", []),
                     mode=row.get("mode", ""), requester=row.get("created_by"), created_at=row.get("created_at"),
@@ -263,9 +273,120 @@ class Service:
     # ---- evaluation & history ------------------------------------------
     def evaluate(self, trigger: str = "manual", record: bool = True) -> dict:
         results = self.controls.evaluate()
+        current = {r.control_id: r for r in results}
         if record:
+            previous = {cid: snap.get("state") for cid, snap in self.snapshots.latest().items()}
             self.snapshots.record(results, trigger=trigger)
-        return {r.control_id: r for r in results}
+            if previous:  # nothing to compare on the very first evaluation
+                self._notify_transitions(previous, current)
+        return current
+
+    # ---- notifications: a new FAIL / DEGRADED / finding reaches an owner ----
+    def _notifier(self):
+        try:
+            from attest.notify import Notifier
+            from attest.store_sql import NotificationStore
+        except ImportError:
+            return None
+        return Notifier(self.cfg, NotificationStore(self.engine))
+
+    def _notify_transitions(self, previous: dict, current: dict) -> None:
+        try:
+            from attest.notify import diff_states
+        except ImportError:
+            return
+        events = diff_states(previous, {c: r.state for c, r in current.items()}, {c: r.reason for c, r in current.items()})
+        if events:
+            self._dispatch(events)
+
+    def _dispatch(self, events) -> None:
+        notifier = self._notifier()
+        if notifier is None:
+            return
+        try:
+            notifier.dispatch(events)
+        except Exception as e:  # delivery must never break evaluation; it is recorded, not raised
+            self.audit.record(actor="notifier", action="notify.error", subject="dispatch", detail=str(e))
+
+    def notifications(self, limit: int = 50) -> list[dict]:
+        try:
+            from attest.store_sql import NotificationStore
+        except ImportError:
+            return []
+        return NotificationStore(self.engine).recent(limit)
+
+    def history_summary(self, days: int = 90) -> dict:
+        """Observation-window view: how each control behaved over the last N evaluations."""
+        now = datetime.now(timezone.utc)
+        since = (now - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        out = {}
+        for cid in self.catalog:
+            rows = self.snapshots.history(cid, since=since, limit=None)  # newest first
+            if not rows:
+                out[cid] = dict(evaluations=0, current=None, pass_pct=None, transitions=0, timeline=[])
+                continue
+            chron = list(reversed(rows))
+            states = [r["state"] for r in chron]
+            transitions = sum(1 for a, b in zip(states, states[1:]) if a != b)
+            streak_since = chron[-1]["evaluated_at"]
+            for r in reversed(chron):
+                if r["state"] != states[-1]:
+                    break
+                streak_since = r["evaluated_at"]
+            out[cid] = dict(current=states[-1], evaluations=len(states), pass_pct=round(100 * states.count("PASS") / len(states), 1),
+                            transitions=transitions, since=streak_since, first=chron[0]["evaluated_at"], last=chron[-1]["evaluated_at"],
+                            timeline=[dict(t=r["evaluated_at"], s=r["state"]) for r in chron][-60:])
+        return dict(days=days, since=since, controls=out)
+
+    # ---- questionnaires and packages -------------------------------------
+    def questionnaires(self) -> list[dict]:
+        from attest.store_sql import QuestionnaireStore
+        return QuestionnaireStore(self.engine).list()
+
+    def import_questionnaire(self, identity: Identity, path: Path, name: str | None = None) -> dict:
+        from attest.questionnaires import parse_questionnaire
+        from attest.store_sql import QuestionnaireStore
+        identity.require("read:evidence")
+        rows = parse_questionnaire(path)
+        store = QuestionnaireStore(self.engine)
+        qn = store.create(name or path.stem, path.name, identity.email, len(rows))
+        drafts = [self.answer(identity, r["question"], list(r.get("control_ids") or []), questionnaire_id=qn["id"], ref=r.get("ref")) for r in rows]
+        self.audit.record(actor=identity.email, action="questionnaire.imported", subject=qn["id"], detail=f"{len(rows)} questions from {path.name}")
+        return dict(questionnaire=qn, drafts=drafts)
+
+    def questionnaire_rows(self, qn_id: str) -> list[dict]:
+        return [self._queue_item(r) for r in self.drafts.list_for_questionnaire(qn_id)]
+
+    def export_questionnaire(self, identity: Identity, qn_id: str, out: Path, fmt: str | None = None) -> Path:
+        from attest.questionnaires import export_questionnaire
+        from attest.store_sql import QuestionnaireStore
+        identity.require("read:evidence")
+        store = QuestionnaireStore(self.engine)
+        if store.get(qn_id) is None:
+            raise ValueError(f"unknown questionnaire {qn_id}")
+        rows = self.questionnaire_rows(qn_id)
+        pending = [r["question_id"] for r in rows if r["status"] == "READY" and not r.get("decision")]
+        export_questionnaire(rows, out, fmt)
+        store.set_status(qn_id, "exported")
+        self.audit.record(actor=identity.email, action="questionnaire.exported", subject=qn_id,
+                          detail=f"{len(rows)} rows → {out.name}" + (f" · {len(pending)} undecided" if pending else ""))
+        return out
+
+    def build_package(self, identity: Identity, out: Path, framework: str | None = None, since: str | None = None,
+                      include_restricted: bool = False) -> dict:
+        from attest.packages import build_package
+        from attest.store_sql import PackageStore
+        identity.require("read:evidence")
+        if include_restricted:
+            identity.require("manage:acceptances")  # engineers and admins only; auditors get the publishable+internal set
+        if framework and framework not in FRAMEWORKS:
+            raise ValueError(f"unknown framework {framework}")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        manifest = build_package(self, out, framework=framework, since=since, include_restricted=include_restricted, created_by=identity.email)
+        digest = hashlib.sha256(out.read_bytes()).hexdigest()
+        PackageStore(self.engine).record(identity.email, framework, since, str(out), digest, manifest)
+        self.audit.record(actor=identity.email, action="package.built", subject=out.name, detail=f"framework={framework or 'all'} since={since or '-'} sha256={digest[:16]}")
+        return dict(manifest=manifest, path=str(out), sha256=digest)
 
     def history(self, control_id: str, since: str | None = None, limit: int | None = 200) -> list[dict]:
         if control_id not in self.catalog:
@@ -309,6 +430,13 @@ class Service:
                           subject=orphans[0]["email"] if orphans else "hris-idp-join", detail=rec.payload.get("summary", ""))
         if failed and orphans:
             o = orphans[0]
+            try:
+                from attest.notify import NotifyEvent
+                self._dispatch([NotifyEvent(kind="finding", control_id=JOIN["control"],
+                                            title=f"Leaver still active {o.get('days_open', '?')} days after termination",
+                                            summary=rec.payload.get("summary", ""), evidence_ids=[rec.id])])
+            except ImportError:
+                pass
             self._event("finding", f"Leaver still has an active IdP account {o.get('days_open', '?')} days after termination",
                         f"hris-idp-join · {o.get('name')} <{o.get('email')}> · terminated {o.get('terminated')} · IdP {o.get('idp_status')}",
                         [RULE_TAGS["hris-idp-join"]], rule="hris-idp-join",
@@ -480,4 +608,13 @@ class Service:
             catalog=[dict(id=c.id, name=c.name) for c in self.catalog.values()], controls=controls,
             sources=sources, join=join, configured_sources=self.configured_sources(),
             acceptances=self.acceptances.active(now.strftime("%Y-%m-%d")),
+            questionnaires=self._safe(self.questionnaires, []), notifications=self._safe(lambda: self.notifications(20), []),
         )
+
+    @staticmethod
+    def _safe(fn, default):
+        """Optional read-model parts survive a module that has not shipped yet."""
+        try:
+            return fn()
+        except (ImportError, AttributeError):
+            return default

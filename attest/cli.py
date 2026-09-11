@@ -359,6 +359,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     from attest import cli_collect                # import · collect <source-id|--all> · sources list (config-driven)
     cli_collect.register(sub)
+    try:
+        from attest import cli_product            # package · package-verify · questionnaire · audit-export
+    except ImportError:
+        cli_product = None
+    if cli_product is not None:
+        cli_product.register(sub)
     return p
 
 

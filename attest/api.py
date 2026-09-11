@@ -7,6 +7,7 @@ engineer so the console works out of the box; production returns 401.
 """
 from __future__ import annotations
 
+import hmac
 import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -65,6 +66,11 @@ class KeyIn(BaseModel):
     email: str
     name: str
 
+class PackageIn(BaseModel):
+    framework: str | None = None
+    since: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    include_restricted: bool = False
+
 class UserIn(BaseModel):
     email: str
     role: str
@@ -93,8 +99,14 @@ def create_app(cfg: Config | None = None) -> FastAPI:
         finally:
             scheduler.stop()
 
-    app = FastAPI(title="Attest", version="0.2.0", lifespan=lifespan,
+    app = FastAPI(title="Attest", version="0.3.0", lifespan=lifespan,
                   description="Continuous compliance control plane with a governed agent layer.")
+    try:  # request hardening: security headers, rate limits, origin check (attest/security.py)
+        from attest.security import install as install_security
+        install_security(app, cfg)
+    except ImportError:
+        pass
+    exports_dir = cfg.resolve("exports")
 
     # ---- identity ------------------------------------------------------------
     def identity(request: Request) -> Identity:
@@ -165,6 +177,60 @@ def create_app(cfg: Config | None = None) -> FastAPI:
                             secure=cfg.server.base_url.startswith("https"), max_age=cfg.auth.session_hours * 3600)
         svc(request).audit.record(actor=ident.email, action="auth.login", subject=ident.email, detail=f"role={ident.role}")
         return {"user": ident.email, "role": ident.role, "grants": sorted(ident.grants)}
+
+    @app.get("/api/auth/methods")
+    def auth_methods():
+        oidc = cfg.auth.oidc
+        return {"password": True, "oidc": bool(oidc), "oidc_issuer": oidc.issuer if oidc else None}
+
+    if cfg.auth.oidc:
+        OIDC_COOKIE = "attest_oidc"
+
+        def _oidc(request: Request):
+            from attest.oidc import OIDC
+            return OIDC(cfg.auth.oidc, redirect_uri=f"{cfg.server.base_url.rstrip('/')}/api/auth/oidc/callback")
+
+        @app.get("/api/auth/oidc/start")
+        def oidc_start(request: Request):
+            from fastapi.responses import RedirectResponse
+            flow = _oidc(request).start()
+            resp = RedirectResponse(flow["url"], status_code=302)
+            resp.set_cookie(OIDC_COOKIE, request.app.state.codec.sign({"state": flow["state"], "nonce": flow["nonce"], "verifier": flow["code_verifier"]}),
+                            httponly=True, samesite="lax", max_age=600, secure=cfg.server.base_url.startswith("https"))
+            return resp
+
+        @app.get("/api/auth/oidc/callback")
+        def oidc_callback(request: Request, code: str, state: str):
+            from fastapi.responses import RedirectResponse
+            from attest.oidc import OIDCError
+            token = request.cookies.get(OIDC_COOKIE)
+            if not token:
+                raise AuthError("sign-in session expired — start again")
+            flow = request.app.state.codec.unsign(token, max_age=600)
+            if not hmac.compare_digest(flow.get("state", ""), state):
+                raise AuthError("state mismatch")
+            oidc = _oidc(request)
+            try:
+                claims = oidc.finish(code, flow["verifier"], flow["nonce"])
+                email = oidc.check_email(claims)
+            except OIDCError as e:
+                raise AuthError(f"sign-in refused: {e}") from e
+            engine = request.app.state.engine
+            role = oidc.role_for(claims)
+            existing = {u["email"]: u for u in A.list_users(engine)}
+            if email not in existing:
+                A.create_user(engine, email, role, name=str(claims.get("name") or ""))
+                svc(request).audit.record(actor=email, action="user.created", subject=email, detail=f"oidc first login · role={role}")
+            elif cfg.auth.oidc.role_claim and existing[email]["role"] != role:
+                A.set_user_role(engine, email, role)
+                svc(request).audit.record(actor=email, action="user.role", subject=email, detail=f"oidc claim → {role}")
+            ident = A.identity_for_email(engine, email, via="oidc")
+            resp = RedirectResponse("/", status_code=302)
+            resp.delete_cookie(OIDC_COOKIE)
+            resp.set_cookie(COOKIE, request.app.state.codec.issue(ident), httponly=True, samesite="lax",
+                            secure=cfg.server.base_url.startswith("https"), max_age=cfg.auth.session_hours * 3600)
+            svc(request).audit.record(actor=ident.email, action="auth.login", subject=ident.email, detail=f"role={ident.role} via oidc")
+            return resp
 
     @app.post("/api/auth/logout")
     def do_logout(response: Response):
@@ -301,6 +367,60 @@ def create_app(cfg: Config | None = None) -> FastAPI:
     @app.get("/api/gate")
     def gate(request: Request, strict: bool = False, ident: Identity = Depends(identity)):
         return svc(request).gate(strict=strict)
+
+    # ---- history, notifications, packages, questionnaires ------------------------------------
+    @app.get("/api/history/summary")
+    def history_summary(request: Request, days: int = 90, ident: Identity = Depends(identity)):
+        return svc(request).history_summary(days=days)
+
+    @app.get("/api/notifications")
+    def notifications(request: Request, limit: int = 50, ident: Identity = Depends(identity)):
+        ident.require("read:evidence")
+        return svc(request).notifications(limit)
+
+    @app.post("/api/package")
+    def package(body: PackageIn, request: Request, ident: Identity = Depends(identity)):
+        stamp = A.utcnow().replace(":", "").replace("-", "")
+        out = exports_dir / f"attest-package-{body.framework or 'all'}-{stamp}.zip"
+        result = svc(request).build_package(ident, out, framework=body.framework, since=body.since, include_restricted=body.include_restricted)
+        return FileResponse(result["path"], media_type="application/zip", filename=out.name,
+                            headers={"X-Attest-Package-SHA256": result["sha256"]})
+
+    @app.get("/api/packages")
+    def packages(request: Request, ident: Identity = Depends(identity)):
+        from attest.store_sql import PackageStore
+        return PackageStore(request.app.state.engine).list()
+
+    @app.get("/api/questionnaires")
+    def questionnaires(request: Request, ident: Identity = Depends(identity)):
+        return svc(request).questionnaires()
+
+    @app.post("/api/questionnaires", status_code=201)
+    async def import_questionnaire(request: Request, file: UploadFile = File(...), name: str | None = Form(None),
+                                   ident: Identity = Depends(identity)):
+        suffix = Path(file.filename or "questionnaire.csv").suffix or ".csv"
+        with tempfile.NamedTemporaryFile("wb", suffix=suffix, delete=False) as tmp:
+            tmp.write(await file.read())
+            tmp_path = Path(tmp.name)
+        try:
+            result = svc(request).import_questionnaire(ident, tmp_path, name=name or Path(file.filename or "").stem or None)
+        finally:
+            tmp_path.unlink(missing_ok=True)
+        return dict(questionnaire=result["questionnaire"], drafted=len(result["drafts"]), state=svc(request).state(ident))
+
+    @app.get("/api/questionnaires/{qn_id}/rows")
+    def questionnaire_rows(qn_id: str, request: Request, ident: Identity = Depends(identity)):
+        return svc(request).questionnaire_rows(qn_id)
+
+    @app.get("/api/questionnaires/{qn_id}/export")
+    def export_questionnaire(qn_id: str, request: Request, fmt: str = "csv", ident: Identity = Depends(identity)):
+        if fmt not in ("csv", "xlsx"):
+            raise ValueError("fmt must be csv or xlsx")
+        out = exports_dir / f"{qn_id}.{fmt}"
+        exports_dir.mkdir(parents=True, exist_ok=True)
+        svc(request).export_questionnaire(ident, qn_id, out, fmt)
+        media = "text/csv" if fmt == "csv" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        return FileResponse(out, media_type=media, filename=out.name)
 
     # ---- users + keys (admin) ---------------------------------------------------------
     @app.get("/api/users")

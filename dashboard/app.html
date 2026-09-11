@@ -233,6 +233,20 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
 .join .acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .ev[data-v="finding"] .evbtn{border-left-color:var(--fail)}
 
+/* ── history drawer ── */
+.hist{position:fixed;top:0;right:0;bottom:0;width:min(520px,100%);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow-lg);z-index:31;display:flex;flex-direction:column;padding:18px 20px;gap:12px;overflow:auto}
+.hist h3{font-size:15px;font-weight:600}
+.hist .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.hist .stat{padding:10px 12px;border:1px solid var(--line);border-radius:8px}
+.hist .stat .k{font-size:11px;color:var(--ink-3);font-weight:600}
+.hist .stat .v{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.tl{display:flex;gap:2px;height:28px;align-items:stretch}
+.tl i{flex:1;border-radius:2px;background:var(--pass-soft)}
+.tl i.PASS{background:var(--pass)} .tl i.DEGRADED{background:var(--warn)} .tl i.FAIL{background:var(--fail)}
+.hist table{font-size:12px}
+tr[data-hist]{cursor:pointer}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+
 /* ── demo panel ── */
 .scrim{position:fixed;inset:0;background:rgba(11,18,32,.35);z-index:30}
 .panel{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow-lg);z-index:31;display:flex;flex-direction:column;padding:18px 20px;gap:14px;overflow:auto}
@@ -283,6 +297,7 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
 </div>
 
 <div class="scrim" id="scrim" hidden></div>
+<aside class="hist" id="hist" hidden aria-label="Control history"></aside>
 <aside class="panel" id="panel" hidden aria-label="Demo actions">
   <div style="display:flex;align-items:center;gap:10px"><h3>Demo actions</h3><button type="button" class="btn sm close" id="panel-close">Close</button></div>
   <p>Each button calls the real agent layer against the real store and writes to the real audit log. Nothing here is scripted.</p>
@@ -411,8 +426,19 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
       '<div class="kpis">' + kp.map(function(m){ return '<div class="card kpi"><div class="k">' + h(m.k) + '</div><div class="v ' + (m.tone||"") + '">' + m.v + '</div>' + (m.bar != null ? '<div class="bar"><i class="' + (m.barTone||"") + '" style="width:' + m.bar + '%"></i></div>' : '') + '<div class="sub">' + h(m.sub) + '</div></div>'; }).join("") + '</div>' +
       '<div class="card"><div class="card-h"><h3>Control catalog</h3><span class="sub">Tested once · mapped outward · worst first</span></div>' +
       '<div class="tbl-wrap"><table><thead><tr><th>Control</th><th>Name</th><th>SLA</th><th>Evidence</th><th>State</th></tr></thead><tbody>' +
-      rows.map(function(c){ return '<tr><td class="id' + (c.state === "FAIL" ? ' fail' : '') + '">' + h(c.id) + '</td><td><div class="rowname">' + h(c.name) + '</div>' + (c.state !== "PASS" && c.reason ? '<div class="rownote">' + h(c.failing_summary || tidy(c.reason)) + '</div>' : '') + '</td><td class="num">' + sla(c.sla_hours) + '</td><td class="num">' + c.evidence + '</td><td>' + pill(STATE[c.state], c.state.toLowerCase()) + '</td></tr>'; }).join("") +
-      '</tbody></table></div><div class="legend"><span><b>Pass</b> — required kinds present and inside SLA</span><span><b>Degraded</b> — present but stale</span><span><b>Fail</b> — missing, or a record reports result=fail</span></div></div>';
+      rows.map(function(c){ return '<tr data-hist="' + h(c.id) + '" title="Click for history"><td class="id' + (c.state === "FAIL" ? ' fail' : '') + '">' + h(c.id) + '</td><td><div class="rowname">' + h(c.name) + '</div>' + (c.state !== "PASS" && c.reason ? '<div class="rownote">' + h(c.failing_summary || tidy(c.reason)) + '</div>' : '') + '</td><td class="num">' + sla(c.sla_hours) + '</td><td class="num">' + c.evidence + '</td><td>' + pill(STATE[c.state], c.state.toLowerCase()) + '</td></tr>'; }).join("") +
+      '</tbody></table></div><div class="legend"><span><b>Pass</b> — required kinds present and inside SLA</span><span><b>Degraded</b> — present but stale</span><span><b>Fail</b> — missing, or a record reports result=fail</span><span>Click a control for its history</span></div></div>';
+  }
+  function showHistory(cid){
+    fetch("/api/history/summary?days=90", {headers:hdrs()}).then(function(r){ return r.json(); }).then(function(j){
+      var c = (j.controls || {})[cid], ctl = S.controls.filter(function(x){ return x.id === cid; })[0] || {name: cid};
+      var body = !c || !c.evaluations ? '<p class="hint">No evaluations recorded in the last ' + j.days + ' days yet. Every collector run, import and scheduled evaluation adds one.</p>' :
+        '<div class="stats"><div class="stat"><div class="k">Current</div><div class="v">' + pill(STATE[c.current], c.current.toLowerCase()) + '</div></div><div class="stat"><div class="k">Passing</div><div class="v">' + h(c.pass_pct) + '%</div></div><div class="stat"><div class="k">Transitions</div><div class="v">' + h(c.transitions) + '</div></div></div>' +
+        '<div><div class="hint" style="margin-bottom:6px">' + h(c.evaluations) + ' evaluations · ' + h(c.first.slice(0,16).replace("T"," ")) + ' → ' + h(c.last.slice(0,16).replace("T"," ")) + ' · in current state since ' + h(c.since.slice(0,16).replace("T"," ")) + '</div><div class="tl">' + c.timeline.map(function(t){ return '<i class="' + h(t.s) + '" title="' + h(t.t) + ' · ' + h(t.s) + '"></i>'; }).join("") + '</div></div>' +
+        '<div class="tbl-wrap"><table><thead><tr><th>Evaluated</th><th>State</th></tr></thead><tbody>' + c.timeline.slice().reverse().slice(0, 25).map(function(t){ return '<tr><td class="num">' + h(t.t.replace("T"," ").slice(0,19)) + '</td><td>' + pill(STATE[t.s], t.s.toLowerCase()) + '</td></tr>'; }).join("") + '</tbody></table></div>';
+      var el = $("#hist"); el.hidden = false; $("#scrim").hidden = false;
+      el.innerHTML = '<div style="display:flex;align-items:center;gap:10px"><div><div class="eyebrow mono" style="font-size:11px;color:var(--ink-3)">' + h(cid) + '</div><h3>' + h(ctl.name) + '</h3></div><button type="button" class="btn sm" id="hist-close" style="margin-left:auto">Close</button></div>' + body;
+    });
   }
 
   function agent(){
@@ -437,6 +463,9 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
       '<div class="row"><input class="input" type="text" id="ask-q" placeholder="Type a customer question, e.g. Do you log administrative actions?"><button type="submit" class="btn primary">Draft answer</button></div>' +
       '<div class="chips">' + S.catalog.map(function(c){ return '<button type="button" class="chip" data-chip="' + h(c.id) + '" aria-pressed="' + (picked.indexOf(c.id) !== -1) + '">' + h(c.id) + '</button>'; }).join("") +
       '<label class="toggle" title="' + (S.llm_available ? '' : 'needs: pip install anthropic + API credentials') + '"><input type="checkbox" id="ask-llm"' + (S.llm_available ? '' : ' disabled') + '> Draft with Claude, validate with the same guardrails</label></div></form>' +
+      '<form id="qn-form" class="card draft" style="margin-bottom:18px"><div class="card-h" style="padding:0 0 10px;border:0"><h3>Questionnaires</h3><span class="sub">import a customer questionnaire (CSV/XLSX with a question column) — the agent drafts every row; you decide</span></div><div class="row" style="align-items:center"><label class="btn sm" style="cursor:pointer">Choose CSV / XLSX<input type="file" id="qn-file" accept=".csv,.xlsx" hidden></label><span class="hint" id="qn-name"></span><button type="submit" class="btn primary sm">Import & draft</button>' +
+        ((S.questionnaires || []).length ? '<span class="hint" style="margin-left:auto">' + S.questionnaires.length + ' questionnaire' + (S.questionnaires.length === 1 ? '' : 's') + '</span>' : '') + '</div>' +
+        ((S.questionnaires || []).length ? '<div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Rows</th><th>Status</th><th></th></tr></thead><tbody>' + S.questionnaires.map(function(q){ return '<tr><td class="id">' + h(q.id) + '</td><td>' + h(q.name) + '</td><td class="num">' + h(q.row_count) + '</td><td>' + pill(q.status === "exported" ? "pass" : "acc", q.status) + '</td><td style="text-align:right"><a class="btn sm" href="/api/questionnaires/' + encodeURIComponent(q.id) + '/export?fmt=csv">CSV</a> <a class="btn sm" href="/api/questionnaires/' + encodeURIComponent(q.id) + '/export?fmt=xlsx">XLSX</a></td></tr>'; }).join("") + '</tbody></table></div>' : '') + '</form>' +
       '<div class="card"><div class="card-h"><h3>Northwind Data Systems</h3><span class="sub">security review</span><div class="right">' + (S.approvals_verified ? '' : pill("fail", "signature mismatch")) + pill(pending ? "acc" : "pass", pending ? pending + " pending" : "queue clear") + '</div></div>' +
       (S.queue.length ? S.queue.map(function(q){
         var stale = q.citations.some(function(c){ return c.stale; }), ready = q.status === "READY", decided = !!q.decision, blocked = q.status === "BLOCKED";
@@ -457,7 +486,8 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
     var ids = Object.keys(S.frameworks); if(!fw || ids.indexOf(fw) === -1) fw = ids[0];
     var hipaa = fw === "hipaa", rows = S.posture[fw], fails = rows.filter(function(r){ return r.state === "FAIL"; });
     var byId = {}; S.controls.forEach(function(c){ byId[c.id] = c; });
-    $("#v-frameworks").innerHTML =
+    var pkgBar = '<div class="tools"><span class="hint">Evidence package for an auditor: control matrix, posture, evidence, chain proof, audit trail, signed manifest.</span><button type="button" class="btn sm" data-package="' + h(fw) + '">Export ' + h(S.frameworks[fw]) + ' package</button><button type="button" class="btn sm" data-package="">Export all frameworks</button></div>';
+    $("#v-frameworks").innerHTML = pkgBar +
       '<div class="seg" role="tablist">' + ids.map(function(id){ var rs = S.posture[id], p = rs.filter(function(r){ return r.state === "PASS"; }).length; return '<button type="button" role="tab" data-fw="' + id + '" aria-selected="' + (id === fw) + '">' + h(S.frameworks[id]) + '<span class="c">' + p + '/' + rs.length + '</span></button>'; }).join("") + '</div>' +
       (fails.length ? '<div class="gapline"><b>' + fails.map(function(r){ return fwName(fw, r.framework_id) + ' fails'; }).join(" · ") + '</b><span>' + h(fails.map(function(r){ return r.control_id; }).filter(function(v,i,a){ return a.indexOf(v) === i; }).join(", ")) + (fails.length === 1 ? ' is the only failing control in this view; it appears once in every framework it maps to.' : ' are failing in this view.') + '</span></div>' : '<div class="gapline ok"><b>No failing criteria</b><span>Every mapped control passes or is degraded in this framework.</span></div>') +
       '<div class="card"><div class="tbl-wrap"><table style="min-width:720px"><thead><tr><th>' + (hipaa ? 'Citation' : 'Criterion') + '</th><th>Internal control</th>' + (hipaa ? '<th>Spec</th>' : '') + '<th>Evidence</th><th>State</th></tr></thead><tbody>' +
@@ -472,7 +502,9 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
       '</tbody></table></div><div class="legend" style="flex-direction:column;gap:4px"><span><b>publishable</b> — citable in a customer-facing answer</span><span><b>internal</b> — readable inside the org, never egressed</span><span><b>restricted</b> — open findings; blocked at retrieval, not filtered after</span></div></div>' +
       '<div class="card"><div class="card-h"><h3>Audit trail</h3><span class="sub">actor · model version · approver</span><div class="right">' + (S.approvals_verified ? pill("pass","signatures verified") : pill("fail","signature mismatch")) + '</div></div><div>' +
       (S.audit.length ? S.audit.map(function(e, i){ var who = e.approver ? 'approver: ' + h(e.approver) : h(e.actor) + (e.model_version && e.model_version !== e.actor ? ' · ' + h(e.model_version) : ''); return '<div class="au' + (i === 0 && window.__auditNew ? ' new' : '') + '"><span class="when">' + h(e.ts.slice(11)) + '</span><span><span class="head">' + h(e.action) + ' · ' + h(e.subject) + '</span><span class="who">' + who + (e.rule ? ' · rule: ' + h(e.rule) : '') + (e.detail ? ' · ' + h(e.detail) : '') + '</span></span></div>'; }).join("") : '<p class="empty">Nothing recorded yet.</p>') + '</div>' +
-      '<div class="legend"><span>Every record’s SHA-256 covers its content plus the previous digest. No update or delete method exists — by construction.</span></div></div></div>';
+      '<div class="legend"><span>Every record’s SHA-256 covers its content plus the previous digest. No update or delete method exists — by construction.</span></div></div></div>' +
+      '<div class="card" style="margin-top:16px"><div class="card-h"><h3>Notifications</h3><span class="sub">a new FAIL, DEGRADED or join finding goes to its owner — Slack and Jira, deduplicated per control and state</span></div>' +
+      ((S.notifications || []).length ? '<div class="tbl-wrap"><table><thead><tr><th>Sent</th><th>Control</th><th>Kind</th><th>Target</th><th>Owner</th><th>Due</th><th>Status</th></tr></thead><tbody>' + S.notifications.map(function(n){ return '<tr><td class="num">' + h((n.sent_at||"").slice(0,16).replace("T"," ")) + '</td><td class="id">' + h(n.control_id) + '</td><td>' + h(n.kind) + '</td><td>' + h(n.target) + (n.external_id ? ' <span class="mono hint">' + h(n.external_id) + '</span>' : '') + '</td><td>' + h(n.owner || "unassigned") + '</td><td class="num">' + h(n.due || "—") + '</td><td>' + pill(n.status === "sent" ? "pass" : "fail", n.status) + (n.detail && n.status !== "sent" ? ' <span class="hint">' + h(String(n.detail).slice(0,80)) + '</span>' : '') + '</td></tr>'; }).join("") + '</tbody></table></div>' : '<p class="empty">Nothing sent yet. Enable Slack or Jira under [notifications] in attest.toml; the next new failure will be routed to its owner.</p>') + '</div>';
   }
 
   function sources(){
@@ -504,7 +536,10 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
     var chip = ev.target.closest("button.chip"); if(chip){ var id = chip.dataset.chip, i = picked.indexOf(id); if(i === -1) picked.push(id); else picked.splice(i, 1); chip.setAttribute("aria-pressed", String(i === -1)); return; }
     var dec = ev.target.closest("button[data-decide]"); if(dec){ window.__auditNew = true; api("/api/decide", {question_id: dec.closest(".q").dataset.q, decision: dec.dataset.decide}); return; }
     if(ev.target.closest("#demo-btn")){ panel = true; chrome(); return; }
-    if(ev.target.closest("#panel-close") || ev.target.id === "scrim"){ panel = false; chrome(); return; }
+    if(ev.target.closest("#panel-close") || ev.target.id === "scrim" || ev.target.closest("#hist-close")){ panel = false; $("#hist").hidden = true; chrome(); return; }
+    var hr = ev.target.closest("tr[data-hist]"); if(hr){ showHistory(hr.dataset.hist); return; }
+    var pk = ev.target.closest("button[data-package]"); if(pk){ pk.disabled = true; var fw0 = pk.dataset.package || null;
+      fetch("/api/package", {method:"POST", headers:hdrs(), body: JSON.stringify({framework: fw0})}).then(function(r){ if(!r.ok){ return r.json().then(function(j){ toast(j.error || "export failed"); }); } var name = (r.headers.get("content-disposition") || "").split("filename=")[1] || "attest-package.zip"; return r.blob().then(function(b){ var u = URL.createObjectURL(b), a = document.createElement("a"); a.href = u; a.download = name.replace(/"/g, ""); document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(u); toast("Package exported · sha256 " + (r.headers.get("x-attest-package-sha256") || "").slice(0,16) + "…"); }); }).finally(function(){ pk.disabled = false; }); return; }
     var b = ev.target.closest("button[data-do]"); if(!b) return;
     var act = b.dataset.do; window.__auditNew = true;
     var go = function(v){ return function(){ panel = false; view = v; chrome(); window.scrollTo(0,0); }; };
@@ -531,12 +566,18 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
         .then(function(){ return load(); }).then(function(){ toast("Now acting as " + S.identity.user + " (" + S.identity.role + ") — grants: " + S.identity.grants.join(", ")); });
     }
     if(ev.target.id === "import-file" && ev.target.files.length){ $("#import-name").textContent = ev.target.files[0].name; }
+    if(ev.target.id === "qn-file" && ev.target.files.length){ $("#qn-name").textContent = ev.target.files[0].name; }
   });
   document.addEventListener("click", function(ev){
     if(ev.target.closest("#signout")){ fetch("/api/auth/logout", {method:"POST"}).then(function(){ location.href = "/login"; }); return; }
     var run = ev.target.closest("button[data-run]"); if(run){ run.disabled = true; fetch("/api/sources/" + encodeURIComponent(run.dataset.run) + "/collect", {method:"POST", headers:hdrs()}).then(function(r){ return r.json().then(function(j){ if(!r.ok){ toast(j.error || "run failed"); } else { toast(run.dataset.run + ": " + j.status + " · " + (j.summary || (j.records + " records"))); } return load(); }); }); return; }
   });
   document.addEventListener("submit", function(ev){
+    if(ev.target.id === "qn-form"){ ev.preventDefault();
+      var qf = $("#qn-file"); if(!qf.files.length){ toast("Choose a questionnaire file"); return; }
+      var qd = new FormData(); qd.append("file", qf.files[0]);
+      fetch("/api/questionnaires", {method:"POST", body: qd}).then(function(r){ return r.json().then(function(j){ if(!r.ok){ toast(j.error || "import failed"); return; } S = j.state; render(); toast("Drafted " + j.drafted + " answers for " + j.questionnaire.id); }); });
+      return; }
     if(ev.target.id !== "import-form") return; ev.preventDefault();
     var f = $("#import-file"); if(!f.files.length){ toast("Choose a CSV or JSON file"); return; }
     var fd = new FormData(); fd.append("file", f.files[0]); var m = $("#import-mapping").value; if(m) fd.append("mapping", m);
@@ -544,7 +585,7 @@ td.num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-2);
       if(!r.ok){ toast(j.error || "import failed"); if(j.problems){ $("#import-problems").innerHTML = j.problems.map(function(p){ return '<li>' + h(p) + '</li>'; }).join(""); } return; }
       $("#import-problems").innerHTML = ""; toast("Imported " + j.records + " record" + (j.records === 1 ? "" : "s") + " · " + j.kinds.join(", ")); f.value = ""; $("#import-name").textContent = ""; return load(); }); });
   });
-  document.addEventListener("keydown", function(ev){ if(ev.key === "Escape" && panel){ panel = false; chrome(); } });
+  document.addEventListener("keydown", function(ev){ if(ev.key === "Escape"){ panel = false; $("#hist").hidden = true; chrome(); } });
   load().then(loadPersonas);
 })();
 </script>

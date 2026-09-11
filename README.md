@@ -51,6 +51,35 @@ Every import is validated as a whole before a single record is written, recorded
 
 Live collectors so far: **GitHub** (branch protection, `GITHUB_TOKEN`) and the **HRIS × IdP join**. The evidence-source catalog in [`attest/sources.py`](attest/sources.py) names the 22 systems across eight families that a real fleet fills in.
 
+## Live collectors
+
+Every source is a `[sources.<id>]` block in `attest.toml`; secrets are always named by environment variable, never written in the file (the config loader refuses literal tokens).
+
+| Type | Reads | Feeds |
+|---|---|---|
+| `aws` | Config rule compliance, IAM account summary + access-key age, Access Analyzer findings, CloudTrail trails, GuardDuty findings, Security Hub failed findings — via a read-only role (`role_arn` optional) | encryption, network, logging, IAM, detection controls |
+| `okta` | users + status, MFA factors, sign-on policy | `idp.users` (join input), `idp.mfa-enrollment`, `sso.enforced` |
+| `github` | org-wide branch protection, required checks, secret-scanning alerts, sampled merged PRs with approvals | change-management controls |
+| `bamboohr` | the employee roster with hire/termination dates | `hris.roster` (join input) |
+| `hris-idp-join` | the two records above | `access.leaver-deprovisioned` → **CTL-ACCESS-02** |
+| `http-json` | any JSON API, with a summary template and pass/fail checks you declare | any kind in the catalog |
+| `csv` / `json` | files under `imports/` | anything |
+
+Sign in with your identity provider: `[auth.oidc]` (Okta, Entra ID, Google — any OpenID Connect issuer; Authorization Code + PKCE, ID tokens verified against JWKS, roles mapped from a claim). Docs: [`docs/collectors-aws-okta.md`](docs/collectors-aws-okta.md), [`docs/collectors-github-hris-http.md`](docs/collectors-github-hris-http.md).
+
+## For the audit
+
+- **Evidence packages** — `attest package --framework hipaa --since 2026-01-01` (or the button on the Frameworks view) writes a zip: control matrix (CSV + JSON), posture, evidence records, hash-chain proof, audit trail, acceptances, and a manifest whose SHA-256s and HMAC signature `attest package-verify` checks. Restricted records stay out unless an engineer asks for them.
+- **Questionnaires** — import a customer questionnaire (CSV/XLSX with a `question` column); the agent drafts every row with citations, humans approve in the queue, export CSV/XLSX with answers, approver and signature.
+- **Control history** — click any control on the Posture view: pass rate, transitions and a timeline over the observation window (`GET /api/history/summary?days=90`).
+- **Notifications** — a new FAIL, DEGRADED or join finding goes to Slack and/or Jira with an owner and a due date (`[notifications]`), deduplicated per control and state, recorded on the ledger.
+- **WORM audit export** — `attest audit-export --s3 s3://bucket/prefix --retain-days 365` uploads the audit trail and its chain proof under S3 Object Lock (COMPLIANCE mode).
+- **MCP** — `ATTEST_API_KEY=… attest-mcp --config attest.toml` serves the publishable evidence to AI clients as the key's user, every call audited.
+
+## Hardening
+
+Security headers (CSP, frame-ancestors, nosniff, referrer policy, optional HSTS), per-IP login throttling and per-identity API rate limits, an origin check on cookie-authenticated state changes, secrets by environment name only, signed approvals and packages, a hash-chained ledger with no update path, SBOM + `pip-audit` in CI and a tagged release pipeline that publishes wheels, an SBOM and a container image. See [`docs/security.md`](docs/security.md) and [`SECURITY.md`](SECURITY.md).
+
 ## Identity and roles
 
 | Role | Grants |

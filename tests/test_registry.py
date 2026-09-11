@@ -44,7 +44,7 @@ path = "imports/evidence.csv"
 type = "github"
 [sources.github.params]
 repos = ["acme/widgets", "acme/api"]
-token = "t0k"
+token_env = "GITHUB_TOKEN"
 
 [sources.broken]
 type = "csv"
@@ -111,11 +111,23 @@ def github(monkeypatch):
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     monkeypatch.delenv("GH_TOKEN", raising=False)
     monkeypatch.setattr(gh, "_default_fetch", fetch)
+
+    def fake_collect(ctx, transport=None):  # the org-wide collector, driven by the same fake fetch
+        from attest.collectors.registry import CollectResult
+        repos = ctx.source.params.get("repos")
+        if not repos and not ctx.source.params.get("org"):
+            raise ValueError("params.org or params.repos (a list of 'owner/name') is required")
+        n = 0
+        for repo in repos or []:
+            n += len(gh.collect_branch_protection(ctx.store, repo, token="t0k", fetch=fetch))
+        return CollectResult(records=n, summary=f"github: {n} records")
+
+    monkeypatch.setattr(gh, "collect", fake_collect)
     return calls
 
 
 def test_registry_covers_the_configurable_types():
-    assert set(COLLECTORS) == {"csv", "json", "github", "hris-idp-join"}
+    assert {"csv", "json", "github", "hris-idp-join", "aws", "okta", "bamboohr", "http-json"} <= set(COLLECTORS)
 
 
 def test_run_source_csv_ok_records_the_run_and_audits(env):
@@ -160,29 +172,35 @@ def test_join_without_inputs_is_an_error_run(env):
     assert audit.all()[-1].action == "collect.error"
 
 
-def test_github_runs_every_repo_with_the_params_token(env, github):
-    config, store, audit = env
-    out = run_source(config, "github", store, audit)
-    assert out["records"] == 4 and out["status"] == "ok"
-    assert out["summary"] == ("acme/widgets: pr.review-required=pass, ci.policy-gate=pass; "
-                              "acme/api: pr.review-required=pass, ci.policy-gate=pass")
-    assert len(github) == 4 and all(token == "t0k" for _, token in github)
-    assert [r.payload["repo"] for r in store.all()] == ["acme/widgets"] * 2 + ["acme/api"] * 2
-    assert audit.all()[-1].actor == "collector:github"
+def test_github_type_runs_the_org_wide_collector(env, monkeypatch):
+    """type = "github" dispatches to attest.collectors.github.collect(ctx)."""
+    import attest.collectors.github as gh
+    from attest.collectors.registry import CollectResult
+    seen = {}
+    def fake_collect(ctx, transport=None):
+        seen["source"] = ctx.source.id; seen["params"] = ctx.source.params
+        return CollectResult(records=0, summary="stubbed")
+    monkeypatch.setattr(gh, "collect", fake_collect)
+    config, store, audit = env[:3]
+    runs = FakeRuns()
+    result = run_source(config, "github", store, audit, runs=runs)
+    assert result["status"] == "ok" and seen["source"] == "github" and seen["params"]["token_env"] == "GITHUB_TOKEN"
 
 
-def test_github_token_falls_back_to_the_environment(env, github, monkeypatch):
-    config, store, audit = env
-    config.sources["github"].params.pop("token")
-    monkeypatch.setenv("GITHUB_TOKEN", "from-env")
-    run_source(config, "github", store, audit)
-    assert {token for _, token in github} == {"from-env"}
+def test_github_without_the_named_env_var_is_an_error_run(env, monkeypatch):
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False); monkeypatch.delenv("GH_TOKEN", raising=False)
+    config, store, audit = env[:3]
+    runs = FakeRuns()
+    with pytest.raises(PermissionError):
+        run_source(config, "github", store, audit, runs=runs)
+    assert any(c[0] == "finish" and c[2] == "error" for c in runs.calls)
+
 
 
 def test_github_needs_repos(env):
     config, store, audit = env
     config.sources["github"].params["repos"] = []
-    with pytest.raises(ValueError, match="needs params.repos"):
+    with pytest.raises(ValueError, match="params.org or params.repos"):
         run_source(config, "github", store, audit)
 
 
@@ -207,8 +225,8 @@ def test_refusals_happen_before_any_run_starts(env):
     assert "hris" in str(exc.value) and "leavers" in str(exc.value)
     with pytest.raises(ValueError, match="source 'paused' is disabled"):
         run_source(config, "paused", store, audit, runs=runs)
-    config.sources["cloud"] = SourceConfig(id="cloud", type="aws")
-    with pytest.raises(ValueError, match="unknown type 'aws'"):
+    config.sources["cloud"] = SourceConfig(id="cloud", type="carrier-pigeon")
+    with pytest.raises(ValueError, match="unknown type 'carrier-pigeon'"):
         run_source(config, "cloud", store, audit, runs=runs)
     assert runs.calls == [] and audit.all() == []
 
@@ -231,10 +249,10 @@ def test_run_all_continues_past_failures(env, github):
 
 def test_run_all_can_include_disabled_and_reports_unknown_types(env, github):
     config, store, audit = env
-    config.sources["cloud"] = SourceConfig(id="cloud", type="aws")
+    config.sources["cloud"] = SourceConfig(id="cloud", type="carrier-pigeon")
     results = {r["source_id"]: r for r in run_all(config, store, audit, only_enabled=False, trigger="manual")}
     assert results["paused"]["status"] == "ok" and results["paused"]["records"] == 4
-    assert results["cloud"]["status"] == "error" and "unknown type 'aws'" in results["cloud"]["error"]
+    assert results["cloud"]["status"] == "error" and "unknown type 'carrier-pigeon'" in results["cloud"]["error"]
     assert results["hris"]["status"] == "ok"
 
 

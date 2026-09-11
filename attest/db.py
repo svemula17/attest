@@ -18,7 +18,7 @@ from sqlalchemy import (JSON, Boolean, DateTime, ForeignKey, Integer, String, Te
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 DEFAULT_URL = "sqlite:///attest.db"
 
 ROLES = ("admin", "engineer", "auditor", "service")
@@ -109,6 +109,51 @@ class Draft(Base):
     approver: Mapped[str | None] = mapped_column(String(128), nullable=True)
     decided_at: Mapped[str | None] = mapped_column(String(32), nullable=True)
     signature: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # v2: which imported questionnaire this draft answers, and the customer's own question reference
+    questionnaire_id: Mapped[str | None] = mapped_column(
+        String(32), ForeignKey("questionnaires.id", name="fk_drafts_questionnaire_id"), nullable=True, index=True)
+    ref: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class Questionnaire(Base):
+    """One imported customer questionnaire; its rows are drafts with this questionnaire_id."""
+    __tablename__ = "questionnaires"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)          # QN-0001…
+    name: Mapped[str] = mapped_column(String(256))
+    source_file: Mapped[str] = mapped_column(String(512), default="")
+    created_at: Mapped[str] = mapped_column(String(32), index=True)
+    created_by: Mapped[str] = mapped_column(String(128))
+    status: Mapped[str] = mapped_column(String(16), default="open")      # open | exported
+    row_count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class Notification(Base):
+    """One delivery attempt of a FAIL / DEGRADED / finding to Slack, Jira or email; dedupe_key makes it idempotent."""
+    __tablename__ = "notifications"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    control_id: Mapped[str] = mapped_column(String(32), index=True)
+    kind: Mapped[str] = mapped_column(String(16))                        # FAIL | DEGRADED | finding
+    dedupe_key: Mapped[str] = mapped_column(String(256), unique=True, index=True)
+    target: Mapped[str] = mapped_column(String(16))                      # slack | jira | email
+    external_id: Mapped[str | None] = mapped_column(String(128), nullable=True)   # Jira key, Slack ts, message id
+    owner: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    due: Mapped[str | None] = mapped_column(String(10), nullable=True)   # YYYY-MM-DD
+    status: Mapped[str] = mapped_column(String(16))                      # sent | error | skipped
+    detail: Mapped[str] = mapped_column(Text, default="")
+    sent_at: Mapped[str] = mapped_column(String(32), index=True)
+
+
+class PackageExport(Base):
+    """A signed auditor evidence package that was built, and its manifest."""
+    __tablename__ = "package_exports"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[str] = mapped_column(String(32), index=True)
+    created_by: Mapped[str] = mapped_column(String(128))
+    framework: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    since: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    path: Mapped[str] = mapped_column(String(1024))
+    sha256: Mapped[str] = mapped_column(String(64), index=True)
+    manifest: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
 class RiskAcceptance(Base):
@@ -185,7 +230,7 @@ def init_db(engine: Engine) -> None:
 MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
 # Databases created by init_db() before Alembic existed carry only settings.schema_version;
 # this maps that number to the Alembic revision that produces the identical schema.
-_SCHEMA_REVISIONS = {1: "0001"}
+_SCHEMA_REVISIONS = {1: "0001", 2: "0002"}
 
 
 def _alembic_config(url: str):

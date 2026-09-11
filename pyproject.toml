@@ -1,6 +1,6 @@
 [project]
 name = "attest"
-version = "0.1.0"
+version = "0.3.0"
 description = "Continuous compliance control plane with a governed agent layer (PoC)"
 requires-python = ">=3.11"
 dependencies = [
@@ -13,11 +13,15 @@ dependencies = [
   "python-multipart>=0.0.9",
   "itsdangerous>=2.2",
   "pydantic>=2.7",
+  "PyJWT[crypto]>=2.8",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "boto3>=1.34", "openpyxl>=3.1", "cyclonedx-bom>=4", "pip-audit>=2.7", "build>=1.2"]
 llm = ["anthropic>=1.0"]
+postgres = ["psycopg[binary]>=3.1"]
+aws = ["boto3>=1.34"]
+xlsx = ["openpyxl>=3.1"]
 
 [project.scripts]
 attest = "attest.cli:main"

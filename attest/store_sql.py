@@ -30,12 +30,13 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from sqlalchemy import and_, func, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from attest.audit import AuditEntry
-from attest.db import (Audit, CollectorRun, ControlSnapshot, Draft, Evidence, RiskAcceptance, session_scope,
-                       to_dict, utcnow)
+from attest.db import (Audit, CollectorRun, ControlSnapshot, Draft, Evidence, Notification, PackageExport, Questionnaire,
+                       RiskAcceptance, session_scope, to_dict, utcnow)
 from attest.evidence import (CLASSIFICATION_ORDER, EvidenceRecord, EvidenceStore, classification_rank,
                              compute_sha256)
 from attest.util import canonical_json, now_iso
@@ -44,6 +45,9 @@ __all__ = [
     "AUDIT_HASHED_FIELDS",
     "AcceptanceStore",
     "DraftStore",
+    "NotificationStore",
+    "PackageStore",
+    "QuestionnaireStore",
     "RunStore",
     "SnapshotStore",
     "SqlAuditLog",
@@ -549,9 +553,12 @@ class DraftStore:
         with session_scope(self.engine) as s:
             return self._next_question_id(s)
 
-    def create(self, draft: dict) -> dict:
-        """Insert a draft. Keys are Draft columns; created_at (and question_id) are filled if missing."""
+    def create(self, draft: dict, questionnaire_id: str | None = None) -> dict:
+        """Insert a draft. Keys are Draft columns; created_at (and question_id) are filled if missing.
+        ``questionnaire_id`` (also accepted as a key of ``draft``) links the row to an imported questionnaire."""
         data = dict(draft)
+        if questionnaire_id is not None:
+            data["questionnaire_id"] = questionnaire_id
         unknown = sorted(set(data) - set(_DRAFT_COLUMNS))
         if unknown:
             raise ValueError(f"unknown draft keys: {', '.join(unknown)}")
@@ -603,6 +610,28 @@ class DraftStore:
         with session_scope(self.engine) as s:
             return int(s.scalar(select(func.count()).select_from(Draft).where(Draft.decision.is_(None))) or 0)
 
+    # -- v2: questionnaires ------------------------------------------------------
+    def list_for_questionnaire(self, questionnaire_id: str) -> list[dict]:
+        """The drafts imported from one questionnaire, in import order (created_at, then question id)."""
+        stmt = (
+            select(Draft)
+            .where(Draft.questionnaire_id == questionnaire_id)
+            .order_by(Draft.created_at, Draft.question_id)
+        )
+        with session_scope(self.engine) as s:
+            return [to_dict(r) for r in s.scalars(stmt).all()]
+
+    def set_ref(self, question_id: str, ref: str | None) -> dict:
+        """Record the customer's own question reference (e.g. '3.2.1') on a draft. Not part of the
+        decision signature, so it can be set after the agent drafted the answer."""
+        with session_scope(self.engine) as s:
+            row = s.get(Draft, question_id)
+            if row is None:
+                raise KeyError(question_id)
+            row.ref = ref
+            s.flush()
+            return to_dict(row)
+
 
 # ---------------------------------------------------------------------------
 # Risk acceptances
@@ -653,3 +682,193 @@ class AcceptanceStore:
                 row.revoked_at = at
                 s.flush()
             return to_dict(row)
+
+
+
+# ---------------------------------------------------------------------------
+# Questionnaires (v2)
+# ---------------------------------------------------------------------------
+QUESTIONNAIRE_STATUSES = ("open", "exported")
+
+
+class QuestionnaireStore:
+    """Imported customer questionnaires. Rows are drafts carrying this questionnaire's id."""
+
+    def __init__(self, engine: Engine):
+        self.engine = engine
+
+    @staticmethod
+    def _next_id(session: Session) -> str:
+        highest = 0
+        for qid in session.scalars(select(Questionnaire.id)).all():
+            suffix = str(qid).rsplit("-", 1)[-1]
+            if suffix.isdigit():
+                highest = max(highest, int(suffix))
+        return f"QN-{highest + 1:04d}"
+
+    def next_id(self) -> str:
+        """``QN-%04d`` one past the highest numeric suffix stored (QN-0001 when empty)."""
+        with session_scope(self.engine) as s:
+            return self._next_id(s)
+
+    def create(self, name: str, source_file: str, created_by: str, row_count: int) -> dict:
+        if not name or not name.strip():
+            raise ValueError("questionnaire name must not be empty")
+        with session_scope(self.engine) as s:
+            if s.get_bind().dialect.name == "sqlite":
+                s.execute(text("BEGIN IMMEDIATE"))  # id assignment and insert under the write lock
+            row = Questionnaire(
+                id=self._next_id(s),
+                name=name.strip(),
+                source_file=source_file or "",
+                created_at=utcnow(),
+                created_by=created_by,
+                status="open",
+                row_count=int(row_count),
+            )
+            s.add(row)
+            s.flush()
+            return to_dict(row)
+
+    def get(self, questionnaire_id: str) -> dict | None:
+        with session_scope(self.engine) as s:
+            row = s.get(Questionnaire, questionnaire_id)
+            return to_dict(row) if row is not None else None
+
+    def list(self, limit: int | None = None) -> list[dict]:
+        """Questionnaires newest first."""
+        stmt = select(Questionnaire).order_by(Questionnaire.created_at.desc(), Questionnaire.id.desc())
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        with session_scope(self.engine) as s:
+            return [to_dict(r) for r in s.scalars(stmt).all()]
+
+    def set_status(self, questionnaire_id: str, status: str) -> dict:
+        if status not in QUESTIONNAIRE_STATUSES:
+            raise ValueError(f"status must be one of {', '.join(QUESTIONNAIRE_STATUSES)}, got {status!r}")
+        with session_scope(self.engine) as s:
+            row = s.get(Questionnaire, questionnaire_id)
+            if row is None:
+                raise KeyError(questionnaire_id)
+            row.status = status
+            s.flush()
+            return to_dict(row)
+
+
+# ---------------------------------------------------------------------------
+# Notifications (v2)
+# ---------------------------------------------------------------------------
+NOTIFICATION_KINDS = ("FAIL", "DEGRADED", "finding")
+NOTIFICATION_TARGETS = ("slack", "jira", "email")
+NOTIFICATION_STATUSES = ("sent", "error", "skipped")
+
+
+class NotificationStore:
+    """Delivery records for FAIL / DEGRADED / finding notifications, idempotent per dedupe_key."""
+
+    def __init__(self, engine: Engine):
+        self.engine = engine
+
+    def already_sent(self, dedupe_key: str) -> bool:
+        """True when a row with this dedupe_key exists — whatever its status, the attempt was made."""
+        with session_scope(self.engine) as s:
+            return s.scalar(select(Notification.id).where(Notification.dedupe_key == dedupe_key)) is not None
+
+    def record(
+        self,
+        control_id: str,
+        kind: str,
+        dedupe_key: str,
+        target: str,
+        status: str,
+        detail: str = "",
+        external_id: str | None = None,
+        owner: str | None = None,
+        due: str | None = None,
+    ) -> dict:
+        """Insert one delivery record. Idempotent on dedupe_key: a second call returns the existing row
+        unchanged (the first delivery is the one of record), including under concurrent writers."""
+        if kind not in NOTIFICATION_KINDS:
+            raise ValueError(f"kind must be one of {', '.join(NOTIFICATION_KINDS)}, got {kind!r}")
+        if target not in NOTIFICATION_TARGETS:
+            raise ValueError(f"target must be one of {', '.join(NOTIFICATION_TARGETS)}, got {target!r}")
+        if status not in NOTIFICATION_STATUSES:
+            raise ValueError(f"status must be one of {', '.join(NOTIFICATION_STATUSES)}, got {status!r}")
+        if not dedupe_key:
+            raise ValueError("dedupe_key must not be empty")
+        if due is not None:
+            _validate_date(due, "due")
+        existing = self._get_by_key(dedupe_key)
+        if existing is not None:
+            return existing
+        try:
+            with session_scope(self.engine) as s:
+                row = Notification(
+                    control_id=control_id,
+                    kind=kind,
+                    dedupe_key=dedupe_key,
+                    target=target,
+                    external_id=external_id,
+                    owner=owner,
+                    due=due,
+                    status=status,
+                    detail=detail or "",
+                    sent_at=utcnow(),
+                )
+                s.add(row)
+                s.flush()
+                return to_dict(row)
+        except IntegrityError:  # lost the race on the unique key: the other writer's row is the record
+            existing = self._get_by_key(dedupe_key)
+            if existing is None:  # pragma: no cover - the unique index is the only path here
+                raise
+            return existing
+
+    def _get_by_key(self, dedupe_key: str) -> dict | None:
+        with session_scope(self.engine) as s:
+            row = s.scalars(select(Notification).where(Notification.dedupe_key == dedupe_key)).first()
+            return to_dict(row) if row is not None else None
+
+    def recent(self, limit: int | None = 50) -> list[dict]:
+        """Newest first."""
+        stmt = select(Notification).order_by(Notification.sent_at.desc(), Notification.id.desc())
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        with session_scope(self.engine) as s:
+            return [to_dict(r) for r in s.scalars(stmt).all()]
+
+
+# ---------------------------------------------------------------------------
+# Package exports (v2)
+# ---------------------------------------------------------------------------
+class PackageStore:
+    """Every auditor evidence package that was built: who, what scope, where, and its manifest."""
+
+    def __init__(self, engine: Engine):
+        self.engine = engine
+
+    def record(self, created_by: str, framework: str | None, since: str | None, path: str, sha256: str, manifest: dict) -> dict:
+        if not sha256 or len(sha256) != 64:
+            raise ValueError("sha256 must be the hex digest of the package file")
+        canonical_json(manifest)  # raise before any write if the manifest is not JSON-serializable
+        with session_scope(self.engine) as s:
+            row = PackageExport(
+                created_at=utcnow(),
+                created_by=created_by,
+                framework=framework,
+                since=since,
+                path=str(path),
+                sha256=sha256,
+                manifest=dict(manifest),
+            )
+            s.add(row)
+            s.flush()
+            return to_dict(row)
+
+    def list(self, limit: int | None = 20) -> list[dict]:
+        """Packages newest first."""
+        stmt = select(PackageExport).order_by(PackageExport.created_at.desc(), PackageExport.id.desc())
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        with session_scope(self.engine) as s:
+            return [to_dict(r) for r in s.scalars(stmt).all()]

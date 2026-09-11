@@ -1,0 +1,75 @@
+# Tag a release:  git tag v0.3.0 && git push origin v0.3.0
+#
+# Tests → wheel/sdist → SBOM (CycloneDX) → dependency audit → container image on GHCR →
+# GitHub release with the artifacts attached. A failing audit fails the release.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write     # create the GitHub release
+  packages: write     # push to ghcr.io
+
+env:
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Test
+        run: python -m pytest -q
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: SBOM (CycloneDX, from the installed environment)
+        run: cyclonedx-py environment --output-format JSON --output-file sbom.json --pyproject pyproject.toml
+
+      - name: Dependency audit
+        continue-on-error: false
+        run: pip-audit --strict
+
+      - name: Image name (GHCR requires lowercase)
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ github.ref_name }}
+            ${{ steps.image.outputs.name }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*
+            sbom.json
+          generate_release_notes: true

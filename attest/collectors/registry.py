@@ -86,6 +86,24 @@ COLLECTORS: dict[str, Callable[[CollectContext], CollectResult]] = {
 }
 
 
+def _lazy(module: str, attr: str = "collect"):
+    """Import a collector module on first use; the type name still appears in COLLECTORS."""
+    def run(ctx):
+        import importlib
+        mod = importlib.import_module(module)
+        return getattr(mod, attr)(ctx)
+    run.__name__ = f"{module}.{attr}"
+    return run
+
+
+# Live collectors (Phase 2). Each module exposes collect(ctx) and describe().
+COLLECTORS.setdefault("aws", _lazy("attest.collectors.aws"))
+COLLECTORS.setdefault("okta", _lazy("attest.collectors.okta"))
+COLLECTORS.setdefault("bamboohr", _lazy("attest.collectors.bamboohr"))
+COLLECTORS.setdefault("http-json", _lazy("attest.collectors.http_json"))
+COLLECTORS["github"] = _lazy("attest.collectors.github")  # org-wide collect(ctx) supersedes the single-repo wrapper
+
+
 def _lookup(config: Config, source_id: str) -> SourceConfig:
     try:
         return config.sources[source_id]
