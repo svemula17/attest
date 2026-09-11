@@ -44,8 +44,27 @@ def _started_by() -> str | None:
 
 # -- import ------------------------------------------------------------------------
 
-def cmd_import(args: argparse.Namespace) -> int:
+
+def _backend(args: argparse.Namespace, config):
+    """`--data DIR` selects the PoC's JSONL layout; otherwise a found attest.toml means the configured database."""
+    explicit = getattr(args, "explicit_data", None)
+    if explicit is None:  # not via attest.cli.main(): a --data value means the PoC layout
+        explicit = getattr(args, "data", None) is not None
+    if not explicit and getattr(config, "path", None) is not None:
+        from attest.cli_admin import _engine_for
+        from attest.store_sql import RunStore, SqlAuditLog, SqlEvidenceStore
+        _, engine = _engine_for(args)
+        return SqlEvidenceStore(engine), SqlAuditLog(engine), RunStore(engine), f"{config.storage.url.split('@')[-1]}"
     store, audit = _open(args.data)
+    return store, audit, open_runs(args), f"{args.data}/evidence.jsonl"
+
+
+def cmd_import(args: argparse.Namespace) -> int:
+    try:
+        config = _load_config(args)
+    except Exception:
+        config = None
+    store, audit, _runs, _where = _backend(args, config)
     path = Path(args.path)
     try:
         result = import_file(store, path, mapping=args.mapping, source=args.source)
@@ -92,14 +111,13 @@ def cmd_collect(args: argparse.Namespace) -> int:
     if not config.sources:
         print("collect: no sources configured (no attest.toml found, or it has no [sources.*]); pass --config")
         return 2
-    store, audit = _open(args.data)
-    runs = open_runs(args)
+    store, audit, runs, where = _backend(args, config)
     if args.all:
         results = run_all(config, store, audit, runs=runs, trigger="manual")
         _print_results(results)
         errors = [r for r in results if r["status"] != "ok"]
         total = sum(r["records"] for r in results)
-        print(f"\n{len(results) - len(errors)} ok · {len(errors)} error · {total} records appended to {args.data}/evidence.jsonl")
+        print(f"\n{len(results) - len(errors)} ok · {len(errors)} error · {total} records appended to {where}")
         return 1 if errors else 0
     src = config.sources.get(args.source_id)
     if src is None:
@@ -120,14 +138,22 @@ def cmd_collect(args: argparse.Namespace) -> int:
 # -- sources list ------------------------------------------------------------------
 
 def _last_status(runs, source_id: str) -> str:
-    last = getattr(runs, "last", None)
-    if runs is None or last is None:
+    """Newest run status for a source from any run store shape (SQL RunStore, or a `last()` fake)."""
+    if runs is None:
         return NONE
-    run = last(source_id)
+    run = None
+    if hasattr(runs, "latest_by_source"):
+        run = runs.latest_by_source().get(source_id)
+    elif hasattr(runs, "last"):
+        run = runs.last(source_id)
+    elif hasattr(runs, "list"):
+        rows = runs.list(source_id=source_id, limit=1)
+        run = rows[0] if rows else None
     if run is None:
         return NONE
     status = run.get("status") if isinstance(run, dict) else getattr(run, "status", None)
-    return str(status) if status else NONE
+    stamp = (run.get("finished_at") or run.get("started_at") or "") if isinstance(run, dict) else ""
+    return f"{status} {stamp[:16].replace('T', ' ')}".strip() if status else NONE
 
 
 def cmd_sources_list(args: argparse.Namespace) -> int:
@@ -140,7 +166,7 @@ def cmd_sources_list(args: argparse.Namespace) -> int:
     if not config.sources:
         print("no sources configured (no attest.toml found, or it has no [sources.*]); pass --config")
         return 0
-    runs = open_runs(args)
+    _s, _a, runs, _w = _backend(args, config)
     print(f"{'ID':<14} {'TYPE':<14} {'SCHEDULE':<14} {'ENABLED':<8} LAST")
     print("-" * 64)
     for sid, src in config.sources.items():

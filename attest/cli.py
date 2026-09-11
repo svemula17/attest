@@ -301,7 +301,7 @@ def cmd_sources(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="attest", description=__doc__)
-    p.add_argument("--data", type=Path, default=Path("data"), help="data directory for the JSONL commands (default ./data)")
+    p.add_argument("--data", type=Path, default=None, help="PoC layout: JSONL data directory (default ./data when no attest.toml applies)")
     p.add_argument("--config", help="attest.toml for the server-side commands (default: ./attest.toml or $ATTEST_CONFIG)")
     sub = p.add_subparsers(dest="cmd", required=True)
     from attest import cli_admin
@@ -370,6 +370,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    args.explicit_data = args.data is not None
+    args.data = args.data or Path("data")
     return args.fn(args)
 
 
